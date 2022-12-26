@@ -119,6 +119,22 @@
 #ifdef Pandas_NpcFilter_STORAGE_DEL
 	export_constant(NPCF_STORAGE_DEL);	// storage_del_filter_name	// OnPCStorageDelFilter		// 当玩家准备将道具取出仓库时触发过滤器
 #endif // Pandas_NpcFilter_STORAGE_DEL
+
+#ifdef Pandas_NpcFilter_CART_ADD
+	export_constant(NPCF_CART_ADD);	// cart_add_filter_name	// OnPCCartAddFilter		// 当玩家准备将道具从背包存入手推车时触发过滤器
+#endif // Pandas_NpcFilter_CART_ADD
+
+#ifdef Pandas_NpcFilter_CART_DEL
+	export_constant(NPCF_CART_DEL);	// cart_del_filter_name	// OnPCCartDelFilter		// 当玩家准备将道具从手推车取回背包时触发过滤器
+#endif // Pandas_NpcFilter_CART_DEL
+
+#ifdef Pandas_NpcFilter_FAVORITE_ADD
+	export_constant(NPCF_FAVORITE_ADD);	// favorite_add_filter_name	// OnPCFavoriteAddFilter		// 当玩家准备将道具移入收藏栏位时触发过滤器 [香草]
+#endif // Pandas_NpcFilter_FAVORITE_ADD
+
+#ifdef Pandas_NpcFilter_FAVORITE_DEL
+	export_constant(NPCF_FAVORITE_DEL);	// favorite_del_filter_name	// OnPCFavoriteDelFilter		// 当玩家准备将道具从收藏栏位移出时触发过滤器 [香草]
+#endif // Pandas_NpcFilter_FAVORITE_DEL
 	// PYHELP - NPCEVENT - INSERT POINT - <Section 6>
 
 	/************************************************************************/
@@ -2227,9 +2243,30 @@
 	export_constant(SC_DEEP_POISONING_OPTION);
 	export_constant(SC_POISON_SHIELD);
 	export_constant(SC_POISON_SHIELD_OPTION);
+	export_constant(SC_SUB_WEAPONPROPERTY);
 	export_constant(SC_M_LIFEPOTION);
 	export_constant(SC_S_MANAPOTION);
-	export_constant(SC_SUB_WEAPONPROPERTY);
+	export_constant(SC_ALMIGHTY);
+	export_constant(SC_ULTIMATECOOK);
+	export_constant(SC_M_DEFSCROLL);
+	export_constant(SC_INFINITY_DRINK);
+	export_constant(SC_MENTAL_POTION);
+	export_constant(SC_LIMIT_POWER_BOOSTER);
+	export_constant(SC_COMBAT_PILL);
+	export_constant(SC_COMBAT_PILL2);
+	export_constant(SC_MYSTICPOWDER);
+	export_constant(SC_SPARKCANDY);
+	export_constant(SC_MAGICCANDY);
+	export_constant(SC_ACARAJE);
+	export_constant(SC_POPECOOKIE);
+	export_constant(SC_VITALIZE_POTION);
+	export_constant(SC_CUP_OF_BOZA);
+	export_constant(SC_SKF_MATK);
+	export_constant(SC_SKF_ATK);
+	export_constant(SC_SKF_ASPD);
+	export_constant(SC_SKF_CAST);
+	export_constant(SC_BEEF_RIB_STEW);
+	export_constant(SC_PORK_RIB_STEW);
 
 #ifdef RENEWAL
 	export_constant(SC_EXTREMITYFIST2);
@@ -4848,6 +4885,7 @@
 	export_constant(MOB_ELEMENT);
 	export_constant(MOB_MODE);
 	export_constant(MOB_MVPEXP);
+	export_constant(MOB_ID);
 
 	/* petinfo types */
 	export_constant(PETINFO_ID);
@@ -6224,10 +6262,41 @@
 	export_constant(IG_4LV_10REFINE_WEAPON_9GU);
 	export_constant(IG_4LV_11REFINE_WEAPON_10G);
 	export_constant(IG_BS_ITEM_M_S_52);
-	export_constant(IG_Bs_Item_M_S_53);
-	export_constant(IG_Bs_Item_M_S_54);
-	export_constant(IG_Bs_Item_M_S_55);
-	export_constant(IG_Bs_Item_M_S_56);
+	export_constant(IG_BS_ITEM_M_S_53);
+	export_constant(IG_BS_ITEM_M_S_54);
+	export_constant(IG_BS_ITEM_M_S_55);
+	export_constant(IG_BS_ITEM_M_S_56);
+	export_constant(IG_ENCHANT_STONE_BOX28);
+	export_constant(IG_S_FULLPENE_EARRING);
+	export_constant(IG_S_FULLPENE_PENDANT);
+	export_constant(IG_S_FULLPENE_ARMOR);
+	export_constant(IG_S_FULLPENE_SHOES);
+	export_constant(IG_S_FULLTEMP_EARRING);
+	export_constant(IG_S_FULLTEMP_PENDANT);
+	export_constant(IG_S_FULLTEMP_ARMOR);
+	export_constant(IG_S_FULLTEMP_SHOES);
+	export_constant(IG_S_DURABLE_WEAPON);
+	export_constant(IG_S_DURABLE_SHIELD);
+	export_constant(IG_S_CLEVER_WEAPON);
+	export_constant(IG_S_CLEVER_SHIELD);
+	export_constant(IG_S_ALLMIGHTY_EARRING);
+	export_constant(IG_S_ALLMIGHTY_PENDANT);
+	export_constant(IG_S_TRUEGEM_EARRING);
+	export_constant(IG_S_TRUEGEM_PENDANT);
+	export_constant(IG_S_TRUEGEM_SHOES);
+	export_constant(IG_S_TRUEGEM_ARMOR);
+	export_constant(IG_S_PERFECTSIZE_WEAPON);
+	export_constant(IG_S_PERFECTSIZE_ARMOR);
+	export_constant(IG_S_M_MAMMOTH_EARRING);
+	export_constant(IG_S_M_MAMMOTH_PENDANT);
+	export_constant(IG_S_M_MAMMOTH_ARMOR);
+	export_constant(IG_S_M_MAMMOTH_SHOES);
+	export_constant(IG_S_SPELLCASTER_EARRING);
+	export_constant(IG_S_SPELLCASTER_PENDANT);
+	export_constant(IG_S_SPELLCASTER_ARMOR);
+	export_constant(IG_S_SPELLCASTER_SHOES);
+	export_constant(IG_S_ABSORB_WEAPON);
+	export_constant(IG_S_ABSORB_SHIELD);
 
 	/* unit stop walking */
 	export_constant(USW_NONE);

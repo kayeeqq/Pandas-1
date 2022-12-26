@@ -33,6 +33,7 @@
 #include "log.hpp"
 #include "map.hpp"
 #include "mob.hpp"
+#include "navi.hpp"
 #include "pc.hpp"
 #include "pet.hpp"
 #include "script.hpp" // script_config
@@ -2536,7 +2537,7 @@ void run_tomb(struct map_session_data* sd, struct npc_data* nd)
 
 #ifndef Pandas_Make_Tomb_Mobname_Follow_Override_Mob_Names
 	// TODO: Find exact color?
-	snprintf(buffer, sizeof(buffer), msg_txt(sd,657), nd->u.tomb.md->db->name.c_str());
+	snprintf( buffer, sizeof( buffer ), msg_txt( sd, 657 ), nd->u.tomb.md->db->name.c_str() ); // [ ^EE0000%s^000000 ]
 #else
 	memset(buffer, 0, sizeof(buffer));
 	// 默认情况下先使用魔物被召唤时赋予的名称 (以前只会读取 DB 里的名称)
@@ -2548,17 +2549,17 @@ void run_tomb(struct map_session_data* sd, struct npc_data* nd)
 	else if (battle_config.override_mob_names == 2)
 		snprintf(buffer, sizeof(buffer), msg_txt(sd, 657), nd->u.tomb.md->db->jname.c_str());
 #endif // Pandas_Make_Tomb_Mobname_Follow_Override_Mob_Names
-	clif_scriptmes(sd, nd->bl.id, buffer);
+	clif_scriptmes( *sd, nd->bl.id, buffer );
 
-	clif_scriptmes(sd, nd->bl.id, msg_txt(sd,658));
+	clif_scriptmes( *sd, nd->bl.id, msg_txt( sd, 658 ) ); // Has met its demise
 
-	snprintf(buffer, sizeof(buffer), msg_txt(sd,659), time);
-	clif_scriptmes(sd, nd->bl.id, buffer);
+	snprintf( buffer, sizeof( buffer ), msg_txt( sd, 659 ), time ); // Time of death : ^EE0000%s^000000
+	clif_scriptmes( *sd, nd->bl.id, buffer );
 
-	clif_scriptmes(sd, nd->bl.id, msg_txt(sd,660));
+	clif_scriptmes( *sd, nd->bl.id, msg_txt( sd, 660 ) ); // Defeated by
 
-	snprintf(buffer, sizeof(buffer), msg_txt(sd,661), nd->u.tomb.killer_name[0] ? nd->u.tomb.killer_name : "Unknown");
-	clif_scriptmes(sd, nd->bl.id, buffer);
+	snprintf( buffer, sizeof( buffer ), msg_txt( sd, 661 ), nd->u.tomb.killer_name[0] ? nd->u.tomb.killer_name : "Unknown" ); // [^EE0000%s^000000]
+	clif_scriptmes( *sd, nd->bl.id, buffer );
 
 	clif_scriptclose(sd, nd->bl.id);
 }
@@ -2659,12 +2660,26 @@ bool npc_scriptcont(struct map_session_data* sd, int id, bool closing){
 		return true;
 	}
 
+#ifndef Pandas_ScriptCommand_GetInventoryList
 	if(id != fake_nd->bl.id) { // Not item script
 		if ((npc_checknear(sd, target)) == NULL) {
 			ShowWarning("npc_scriptcont: failed npc_checknear test.\n");
 			return true;
 		}
 	}
+#else
+	if(id != fake_nd->bl.id) { // Not item script
+		if ((npc_checknear(sd, target)) == NULL) {
+			// 若本次继续执行脚本是因为正在等待角色服务器返回仓库数据,
+			// 那么无需进行 npc_checknear 检查
+			if (sd->st && !(sd->st->waiting_guild_storage || sd->st->waiting_premium_storage)) {
+				ShowWarning("npc_scriptcont: failed npc_checknear test.\n");
+				return true;
+			}
+		}
+	}
+#endif // Pandas_ScriptCommand_GetInventoryList
+
 #ifdef SECURE_NPCTIMEOUT
 	if( !closing )
 		sd->npc_idle_tick = gettick(); //Update the last NPC iteration
@@ -4223,6 +4238,12 @@ struct npc_data *npc_create_npc(int16 m, int16 x, int16 y){
 	nd->progressbar.timeout = 0;
 	nd->vd = npc_viewdb[0]; // Default to JT_INVISIBLE
 
+#ifdef MAP_GENERATOR
+	nd->navi.pos = {m, x, y};
+	nd->navi.id = 0;
+	nd->navi.npc = nd;
+#endif
+
 #ifdef Pandas_ScriptCommand_ShowVend
 	nd->vendingboard.show = false;
 	memset(nd->vendingboard.message, 0, NAME_LENGTH + 1);
@@ -4357,6 +4378,11 @@ static const char* npc_parse_warp(char* w1, char* w2, char* w3, char* w4, const 
 	nd->u.warp.y = to_y;
 	nd->u.warp.xs = xs;
 	nd->u.warp.ys = ys;
+
+#ifdef MAP_GENERATOR
+	nd->navi.warp_dest = {map_mapindex2mapid(i), to_x, to_y};
+#endif
+
 	npc_warp++;
 	nd->bl.type = BL_NPC;
 	nd->subtype = NPCTYPE_WARP;
@@ -6460,6 +6486,22 @@ bool npc_event_is_filter(enum npce_event eventtype) {
 #ifdef Pandas_NpcFilter_STORAGE_DEL
 		NPCF_STORAGE_DEL,	// storage_del_filter_name	// OnPCStorageDelFilter		// 当玩家准备将道具取出仓库时触发过滤器
 #endif // Pandas_NpcFilter_STORAGE_DEL
+
+#ifdef Pandas_NpcFilter_CART_ADD
+		NPCF_CART_ADD,	// cart_add_filter_name	// OnPCCartAddFilter		// 当玩家准备将道具从背包存入手推车时触发过滤器
+#endif // Pandas_NpcFilter_CART_ADD
+
+#ifdef Pandas_NpcFilter_CART_DEL
+		NPCF_CART_DEL,	// cart_del_filter_name	// OnPCCartDelFilter		// 当玩家准备将道具从手推车取回背包时触发过滤器
+#endif // Pandas_NpcFilter_CART_DEL
+
+#ifdef Pandas_NpcFilter_FAVORITE_ADD
+		NPCF_FAVORITE_ADD,	// favorite_add_filter_name	// OnPCFavoriteAddFilter		// 当玩家准备将道具移入收藏栏位时触发过滤器 [香草]
+#endif // Pandas_NpcFilter_FAVORITE_ADD
+
+#ifdef Pandas_NpcFilter_FAVORITE_DEL
+		NPCF_FAVORITE_DEL,	// favorite_del_filter_name	// OnPCFavoriteDelFilter		// 当玩家准备将道具从收藏栏位移出时触发过滤器 [香草]
+#endif // Pandas_NpcFilter_FAVORITE_DEL
 		// PYHELP - NPCEVENT - INSERT POINT - <Section 20>
 	};
 
@@ -6685,6 +6727,26 @@ const char *npc_get_script_event_name(int npce_index)
 	case NPCF_STORAGE_DEL:
 		return script_config.storage_del_filter_name;	// OnPCStorageDelFilter		// 当玩家准备将道具取出仓库时触发过滤器
 #endif // Pandas_NpcFilter_STORAGE_DEL
+
+#ifdef Pandas_NpcFilter_CART_ADD
+	case NPCF_CART_ADD:
+		return script_config.cart_add_filter_name;	// OnPCCartAddFilter		// 当玩家准备将道具从背包存入手推车时触发过滤器
+#endif // Pandas_NpcFilter_CART_ADD
+
+#ifdef Pandas_NpcFilter_CART_DEL
+	case NPCF_CART_DEL:
+		return script_config.cart_del_filter_name;	// OnPCCartDelFilter		// 当玩家准备将道具从手推车取回背包时触发过滤器
+#endif // Pandas_NpcFilter_CART_DEL
+
+#ifdef Pandas_NpcFilter_FAVORITE_ADD
+	case NPCF_FAVORITE_ADD:
+		return script_config.favorite_add_filter_name;	// OnPCFavoriteAddFilter		// 当玩家准备将道具移入收藏栏位时触发过滤器 [香草]
+#endif // Pandas_NpcFilter_FAVORITE_ADD
+
+#ifdef Pandas_NpcFilter_FAVORITE_DEL
+	case NPCF_FAVORITE_DEL:
+		return script_config.favorite_del_filter_name;	// OnPCFavoriteDelFilter		// 当玩家准备将道具从收藏栏位移出时触发过滤器 [香草]
+#endif // Pandas_NpcFilter_FAVORITE_DEL
 	// PYHELP - NPCEVENT - INSERT POINT - <Section 3>
 
 	/************************************************************************/
