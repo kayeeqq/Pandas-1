@@ -319,7 +319,7 @@ struct mob_data {
 	struct view_data *vd;
 	bool vd_changed;
 	struct status_data status, *base_status; //Second one is in case of leveling up mobs, or tiny/large mobs.
-	struct status_change sc;
+	status_change sc;
 	std::shared_ptr<s_mob_db> db;	//For quick data access (saves doing mob_db(md->mob_id) all the time) [Skotlex]
 	char name[NAME_LENGTH];
 	struct s_specialState {
@@ -380,14 +380,16 @@ struct mob_data {
 	 * MvP Tombstone NPC ID
 	 **/
 	int tomb_nid;
+#ifndef Pandas_ScriptParams_DamageTaken_Extend
+	uint16 damagetaken;
+#else
+	int damagetaken = -1;	// 魔物实例的承伤倍率, 若为 -1 则表示使用 db 中设置的承伤倍率 [Sola丶小克] 
+#endif // Pandas_ScriptParams_DamageTaken_Extend
 
 	e_mob_bosstype get_bosstype();
 
 #ifdef Pandas_Struct_Mob_Data_Pandas
 	struct {
-#ifdef Pandas_Struct_Mob_Data_DamageTaken
-		int damagetaken = -1;							// 魔物实例的承伤倍率, 若为 -1 则表示使用 db 中设置的承伤倍率 [Sola丶小克] 
-#endif // Pandas_Struct_Mob_Data_DamageTaken
 #ifdef Pandas_Struct_Mob_Data_Special_SetUnitData
 		std::map<uint16, int64>* special_setunitdata;	// 记录魔物被 setunitdata 修改过哪些项目 [Sola丶小克]
 #endif // Pandas_Struct_Mob_Data_Special_SetUnitData
@@ -509,14 +511,14 @@ struct mob_data* mob_once_spawn_sub(struct block_list* bl, int16 m, int16 x, int
 #endif // Pandas_FuncDefine_Mob_Once_Spawn_Sub
 
 #ifndef Pandas_FuncDefine_Mob_Once_Spawn
-int mob_once_spawn(struct map_session_data* sd, int16 m, int16 x, int16 y,
+int mob_once_spawn(map_session_data* sd, int16 m, int16 x, int16 y,
 	const char* mobname, int mob_id, int amount, const char* event, unsigned int size, enum mob_ai ai);
 #else
-int mob_once_spawn(struct map_session_data* sd, int16 m, int16 x, int16 y,
+int mob_once_spawn(map_session_data* sd, int16 m, int16 x, int16 y,
 	const char* mobname, int mob_id, int amount, const char* event, unsigned int size, enum mob_ai ai, uint16 spawn_flag = 0);
 #endif // Pandas_FuncDefine_Mob_Once_Spawn
 
-int mob_once_spawn_area(struct map_session_data* sd, int16 m,
+int mob_once_spawn_area(map_session_data* sd, int16 m,
 	int16 x0, int16 y0, int16 x1, int16 y1, const char* mobname, int mob_id, int amount, const char* event, unsigned int size, enum mob_ai ai);
 
 bool mob_ksprotected (struct block_list *src, struct block_list *target);
@@ -569,7 +571,7 @@ int mob_count_sub(struct block_list *bl, va_list ap);
 
 int mob_is_clone(int mob_id);
 
-int mob_clone_spawn(struct map_session_data *sd, int16 m, int16 x, int16 y, const char *event, int master_id, enum e_mode mode, int flag, unsigned int duration);
+int mob_clone_spawn(map_session_data *sd, int16 m, int16 x, int16 y, const char *event, int master_id, enum e_mode mode, int flag, unsigned int duration);
 int mob_clone_delete(struct mob_data *md);
 
 void mob_reload_itemmob_data(void);
@@ -578,11 +580,7 @@ void mob_add_spawn(uint16 mob_id, const struct spawn_info& new_spawn);
 const std::vector<spawn_info> mob_get_spawns(uint16 mob_id);
 bool mob_has_spawn(uint16 mob_id);
 
-#ifndef Pandas_FuncParams_Mob_GetDroprate
-int mob_getdroprate(struct block_list *src, std::shared_ptr<s_mob_db> mob, int base_rate, int drop_modifier);
-#else
-int mob_getdroprate(struct block_list* src, std::shared_ptr<s_mob_db> mob, int base_rate, int drop_modifier, struct mob_data* md = nullptr);
-#endif // Pandas_FuncParams_Mob_GetDroprate
+int mob_getdroprate(struct block_list *src, std::shared_ptr<s_mob_db> mob, int base_rate, int drop_modifier, mob_data* md = nullptr);
 
 // MvP Tomb System
 int mvptomb_setdelayspawn(struct npc_data *nd);

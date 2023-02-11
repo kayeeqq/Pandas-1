@@ -59,6 +59,7 @@
 #endif // Pandas_Aura_Mechanism
 
 using namespace rathena;
+using namespace rathena::server_map;
 
 std::string default_codepage = "";
 
@@ -82,8 +83,6 @@ int db_use_sqldbs = 0;
 char barter_table[32] = "barter";
 char buyingstores_table[32] = "buyingstores";
 char buyingstore_items_table[32] = "buyingstore_items";
-char item_cash_table[32] = "item_cash_db";
-char item_cash2_table[32] = "item_cash_db2";
 #ifdef RENEWAL
 char item_table[32] = "item_db_re";
 char item2_table[32] = "item_db2_re";
@@ -103,6 +102,7 @@ char sales_table[32] = "sales";
 char vendings_table[32] = "vendings";
 char vending_items_table[32] = "vending_items";
 char market_table[32] = "market";
+char partybookings_table[32] = "party_bookings";
 char roulette_table[32] = "db_roulette";
 char guild_storage_log_table[32] = "guild_storage_log";
 
@@ -126,12 +126,12 @@ struct inter_conf inter_config {};
 
 // DBMap declaration
 static DBMap* id_db=NULL; /// int id -> struct block_list*
-static DBMap* pc_db=NULL; /// int id -> struct map_session_data*
+static DBMap* pc_db=NULL; /// int id -> map_session_data*
 static DBMap* mobid_db=NULL; /// int id -> struct mob_data*
 static DBMap* bossid_db=NULL; /// int id -> struct mob_data* (MVP db)
 static DBMap* map_db=NULL; /// unsigned int mapindex -> struct map_data*
 static DBMap* nick_db=NULL; /// uint32 char_id -> struct charid2nick* (requested names of offline characters)
-static DBMap* charid_db=NULL; /// uint32 char_id -> struct map_session_data*
+static DBMap* charid_db=NULL; /// uint32 char_id -> map_session_data*
 static DBMap* regen_db=NULL; /// int id -> struct block_list* (status_natural_heal processing)
 static DBMap* map_msg_db=NULL;
 
@@ -212,8 +212,6 @@ const char* MSG_CONF_NAME_CHT;	// 繁体中文
 
 char wisp_server_name[NAME_LENGTH] = "Server"; // can be modified in char-server configuration file
 
-struct s_map_default map_default;
-
 int console = 0;
 int enable_spy = 0; //To enable/disable @spy commands, which consume too much cpu time when sending packets. [Skotlex]
 int enable_grf = 0;	//To enable/disable reading maps from GRF files, bypassing mapcache [blackhole89]
@@ -232,6 +230,11 @@ struct mapcell cell_template[7] = { 0 };
 #ifdef MAP_GENERATOR
 struct s_generator_options {
 	bool navi;
+	bool itemmoveinfo;
+	bool reputation;
+#ifdef Pandas_UserExperience_Rewrite_MapServerGenerator_Args_Process
+	bool showhelp;
+#endif // Pandas_UserExperience_Rewrite_MapServerGenerator_Args_Process
 } gen_options;
 #endif
 
@@ -535,7 +538,7 @@ int map_delblock(struct block_list* bl)
 int map_moveblock(struct block_list *bl, int x1, int y1, t_tick tick)
 {
 	int x0 = bl->x, y0 = bl->y;
-	struct status_change *sc = NULL;
+	status_change *sc = NULL;
 	int moveblock = ( x0/BLOCK_SIZE != x1/BLOCK_SIZE || y0/BLOCK_SIZE != y1/BLOCK_SIZE);
 
 	if (!bl->prev) {
@@ -560,8 +563,8 @@ int map_moveblock(struct block_list *bl, int x1, int y1, t_tick tick)
 			status_change_end(bl, SC_TATAMIGAESHI);
 			status_change_end(bl, SC_MAGICROD);
 			status_change_end(bl, SC_SU_STOOP);
-			if (sc->data[SC_PROPERTYWALK] &&
-				sc->data[SC_PROPERTYWALK]->val3 >= skill_get_maxcount(sc->data[SC_PROPERTYWALK]->val1,sc->data[SC_PROPERTYWALK]->val2) )
+			if (sc->getSCE(SC_PROPERTYWALK) &&
+				sc->getSCE(SC_PROPERTYWALK)->val3 >= skill_get_maxcount(sc->getSCE(SC_PROPERTYWALK)->val1,sc->getSCE(SC_PROPERTYWALK)->val2) )
 				status_change_end(bl,SC_PROPERTYWALK);
 		}
 	} else
@@ -596,49 +599,49 @@ int map_moveblock(struct block_list *bl, int x1, int y1, t_tick tick)
 		}
 
 		if (sc && sc->count) {
-			if (sc->data[SC_DANCING])
-				skill_unit_move_unit_group(skill_id2group(sc->data[SC_DANCING]->val2), bl->m, x1-x0, y1-y0);
+			if (sc->getSCE(SC_DANCING))
+				skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_DANCING)->val2), bl->m, x1-x0, y1-y0);
 			else {
-				if (sc->data[SC_CLOAKING] && sc->data[SC_CLOAKING]->val1 < 3 && !skill_check_cloaking(bl, NULL))
+				if (sc->getSCE(SC_CLOAKING) && sc->getSCE(SC_CLOAKING)->val1 < 3 && !skill_check_cloaking(bl, NULL))
 					status_change_end(bl, SC_CLOAKING);
-				if (sc->data[SC_WARM])
-					skill_unit_move_unit_group(skill_id2group(sc->data[SC_WARM]->val4), bl->m, x1-x0, y1-y0);
-				if (sc->data[SC_BANDING])
-					skill_unit_move_unit_group(skill_id2group(sc->data[SC_BANDING]->val4), bl->m, x1-x0, y1-y0);
+				if (sc->getSCE(SC_WARM))
+					skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_WARM)->val4), bl->m, x1-x0, y1-y0);
+				if (sc->getSCE(SC_BANDING))
+					skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_BANDING)->val4), bl->m, x1-x0, y1-y0);
 
-				if (sc->data[SC_NEUTRALBARRIER_MASTER])
-					skill_unit_move_unit_group(skill_id2group(sc->data[SC_NEUTRALBARRIER_MASTER]->val2), bl->m, x1-x0, y1-y0);
-				else if (sc->data[SC_STEALTHFIELD_MASTER])
-					skill_unit_move_unit_group(skill_id2group(sc->data[SC_STEALTHFIELD_MASTER]->val2), bl->m, x1-x0, y1-y0);
+				if (sc->getSCE(SC_NEUTRALBARRIER_MASTER))
+					skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_NEUTRALBARRIER_MASTER)->val2), bl->m, x1-x0, y1-y0);
+				else if (sc->getSCE(SC_STEALTHFIELD_MASTER))
+					skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_STEALTHFIELD_MASTER)->val2), bl->m, x1-x0, y1-y0);
 
-				if( sc->data[SC__SHADOWFORM] ) {//Shadow Form Caster Moving
+				if( sc->getSCE(SC__SHADOWFORM) ) {//Shadow Form Caster Moving
 					struct block_list *d_bl;
-					if( (d_bl = map_id2bl(sc->data[SC__SHADOWFORM]->val2)) == NULL || !check_distance_bl(bl,d_bl,10) )
+					if( (d_bl = map_id2bl(sc->getSCE(SC__SHADOWFORM)->val2)) == NULL || !check_distance_bl(bl,d_bl,10) )
 						status_change_end(bl,SC__SHADOWFORM);
 				}
 
-				if (sc->data[SC_PROPERTYWALK]
-					&& sc->data[SC_PROPERTYWALK]->val3 < skill_get_maxcount(sc->data[SC_PROPERTYWALK]->val1,sc->data[SC_PROPERTYWALK]->val2)
+				if (sc->getSCE(SC_PROPERTYWALK)
+					&& sc->getSCE(SC_PROPERTYWALK)->val3 < skill_get_maxcount(sc->getSCE(SC_PROPERTYWALK)->val1,sc->getSCE(SC_PROPERTYWALK)->val2)
 					&& map_find_skill_unit_oncell(bl,bl->x,bl->y,SO_ELECTRICWALK,NULL,0) == NULL
 					&& map_find_skill_unit_oncell(bl,bl->x,bl->y,NPC_ELECTRICWALK,NULL,0) == NULL
 					&& map_find_skill_unit_oncell(bl,bl->x,bl->y,SO_FIREWALK,NULL,0) == NULL
 					&& map_find_skill_unit_oncell(bl,bl->x,bl->y,NPC_FIREWALK,NULL,0) == NULL
-					&& skill_unitsetting(bl,sc->data[SC_PROPERTYWALK]->val1,sc->data[SC_PROPERTYWALK]->val2,x0, y0,0)) {
-						sc->data[SC_PROPERTYWALK]->val3++;
+					&& skill_unitsetting(bl,sc->getSCE(SC_PROPERTYWALK)->val1,sc->getSCE(SC_PROPERTYWALK)->val2,x0, y0,0)) {
+						sc->getSCE(SC_PROPERTYWALK)->val3++;
 				}
 
 
 			}
 			/* Guild Aura Moving */
 			if( bl->type == BL_PC && ((TBL_PC*)bl)->state.gmaster_flag ) {
-				if (sc->data[SC_LEADERSHIP])
-					skill_unit_move_unit_group(skill_id2group(sc->data[SC_LEADERSHIP]->val4), bl->m, x1-x0, y1-y0);
-				if (sc->data[SC_GLORYWOUNDS])
-					skill_unit_move_unit_group(skill_id2group(sc->data[SC_GLORYWOUNDS]->val4), bl->m, x1-x0, y1-y0);
-				if (sc->data[SC_SOULCOLD])
-					skill_unit_move_unit_group(skill_id2group(sc->data[SC_SOULCOLD]->val4), bl->m, x1-x0, y1-y0);
-				if (sc->data[SC_HAWKEYES])
-					skill_unit_move_unit_group(skill_id2group(sc->data[SC_HAWKEYES]->val4), bl->m, x1-x0, y1-y0);
+				if (sc->getSCE(SC_LEADERSHIP))
+					skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_LEADERSHIP)->val4), bl->m, x1-x0, y1-y0);
+				if (sc->getSCE(SC_GLORYWOUNDS))
+					skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_GLORYWOUNDS)->val4), bl->m, x1-x0, y1-y0);
+				if (sc->getSCE(SC_SOULCOLD))
+					skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_SOULCOLD)->val4), bl->m, x1-x0, y1-y0);
+				if (sc->getSCE(SC_HAWKEYES))
+					skill_unit_move_unit_group(skill_id2group(sc->getSCE(SC_HAWKEYES)->val4), bl->m, x1-x0, y1-y0);
 			}
 		}
 	} else
@@ -671,7 +674,7 @@ int map_count_oncell(int16 m, int16 x, int16 y, int type, int flag)
 			if(bl->x == x && bl->y == y && bl->type&type) {
 				if (bl->type == BL_NPC) {	// Don't count hidden or invisible npc. Cloaked npc are counted
 					npc_data *nd = BL_CAST(BL_NPC, bl);
-					if (nd && (nd->bl.m < 0 || nd->sc.option && nd->sc.option&(OPTION_HIDE|OPTION_INVISIBLE)))
+					if (nd->bl.m < 0 || nd->sc.option&(OPTION_HIDE|OPTION_INVISIBLE) || nd->dynamicnpc.owner_char_id != 0)
 						continue;
 				}
 				if(flag&1) {
@@ -1479,7 +1482,7 @@ int map_foreachindir(int(*func)(struct block_list*, va_list), int16 m, int16 x0,
 	struct block_list *bl;
 	int bx, by;
 	int mx0, mx1, my0, my1, rx, ry;
-	uint8 dir = map_calc_dir_xy(x0, y0, x1, y1, 6);
+	uint8 dir = map_calc_dir_xy( x0, y0, x1, y1, DIR_EAST );
 	short dx = dirx[dir];
 	short dy = diry[dir];
 	va_list ap;
@@ -1495,7 +1498,7 @@ int map_foreachindir(int(*func)(struct block_list*, va_list), int16 m, int16 x0,
 		return 0;
 
 	//Special offset handling for diagonal paths
-	if (offset && (dir % 2)) {
+	if( offset && direction_diagonal( (directions)dir ) ){
 		//So that diagonal paths can attach to each other, we have to work with half-tile offsets
 		offset = (2 * offset) - 1;
 		//To get the half-tiles we need to increase length by one
@@ -1521,10 +1524,10 @@ int map_foreachindir(int(*func)(struct block_list*, va_list), int16 m, int16 x0,
 		SWAP(my0, my1);
 
 	//Apply width to the path by turning 90 degrees
-	mx0 -= abs(range*dirx[(dir + 2) % 8]);
-	my0 -= abs(range*diry[(dir + 2) % 8]);
-	mx1 += abs(range*dirx[(dir + 2) % 8]);
-	my1 += abs(range*diry[(dir + 2) % 8]);
+	mx0 -= abs( range * dirx[( dir + 2 ) % DIR_MAX] );
+	my0 -= abs( range * diry[( dir + 2 ) % DIR_MAX] );
+	mx1 += abs( range * dirx[( dir + 2 ) % DIR_MAX] );
+	my1 += abs( range * diry[( dir + 2 ) % DIR_MAX] );
 
 	mx0 = max(mx0, 0);
 	my0 = max(my0, 0);
@@ -1549,7 +1552,7 @@ int map_foreachindir(int(*func)(struct block_list*, va_list), int16 m, int16 x0,
 						rx *= dx;
 						ry *= dy;
 						//These checks only need to be done for diagonal paths
-						if (dir % 2) {
+						if( direction_diagonal( (directions)dir ) ){
 							//Check for length
 							if ((rx + ry < offset) || (rx + ry > 2 * (length + (offset/2) - 1)))
 								continue;
@@ -1585,7 +1588,7 @@ int map_foreachindir(int(*func)(struct block_list*, va_list), int16 m, int16 x0,
 						rx *= dx;
 						ry *= dy;
 						//These checks only need to be done for diagonal paths
-						if (dir % 2) {
+						if( direction_diagonal( (directions)dir ) ){
 							//Check for length
 							if ((rx + ry < offset) || (rx + ry > 2 * (length + (offset / 2) - 1)))
 								continue;
@@ -1873,7 +1876,7 @@ int map_search_freecell(struct block_list *src, int16 m, int16 *x,int16 *y, int1
  *------------------------------------------*/
 bool map_closest_freecell(int16 m, int16 *x, int16 *y, int type, int flag)
 {
-	uint8 dir = 6;
+	uint8 dir = DIR_EAST;
 	int16 tx = *x;
 	int16 ty = *y;
 	int costrange = 10;
@@ -1887,7 +1890,7 @@ bool map_closest_freecell(int16 m, int16 *x, int16 *y, int type, int flag)
 		short dy = diry[dir];
 
 		//Linear search
-		if(dir%2 == 0 && costrange%MOVE_COST == 0) {
+		if( !direction_diagonal( (directions)dir ) && costrange % MOVE_COST == 0 ){
 			tx = *x+dx*(costrange/MOVE_COST);
 			ty = *y+dy*(costrange/MOVE_COST);
 			if(!map_count_oncell(m, tx, ty, type, flag) && map_getcell(m,tx,ty,CELL_CHKPASS)) {
@@ -1897,7 +1900,7 @@ bool map_closest_freecell(int16 m, int16 *x, int16 *y, int type, int flag)
 			}
 		} 
 		//Full diagonal search
-		else if(dir%2 == 1 && costrange%MOVE_DIAGONAL_COST == 0) {
+		else if( direction_diagonal( (directions)dir ) && costrange % MOVE_DIAGONAL_COST == 0 ){
 			tx = *x+dx*(costrange/MOVE_DIAGONAL_COST);
 			ty = *y+dy*(costrange/MOVE_DIAGONAL_COST);
 			if(!map_count_oncell(m, tx, ty, type, flag) && map_getcell(m,tx,ty,CELL_CHKPASS)) {
@@ -1907,7 +1910,7 @@ bool map_closest_freecell(int16 m, int16 *x, int16 *y, int type, int flag)
 			}
 		}
 		//One cell diagonal, rest linear (TODO: Find a better algorithm for this)
-		else if(dir%2 == 1 && costrange%MOVE_COST == 4) {
+		else if( direction_diagonal( (directions)dir ) && costrange % MOVE_COST == 4 ){
 			tx = *x+dx*((dir%4==3)?(costrange/MOVE_COST):1);
 			ty = *y+dy*((dir%4==1)?(costrange/MOVE_COST):1);
 			if(!map_count_oncell(m, tx, ty, type, flag) && map_getcell(m,tx,ty,CELL_CHKPASS)) {
@@ -1925,17 +1928,17 @@ bool map_closest_freecell(int16 m, int16 *x, int16 *y, int type, int flag)
 		}
 
 		//Get next direction
-		if (dir == 5) {
+		if( dir == DIR_SOUTHEAST ){
 			//Diagonal search complete, repeat with higher cost range
 			if(costrange == 14) costrange += 6;
 			else if(costrange == 28 || costrange >= 38) costrange += 2;
 			else costrange += 4;
-			dir = 6;
-		} else if (dir == 4) {
+			dir = DIR_EAST;
+		}else if( dir == DIR_SOUTH ){
 			//Linear search complete, switch to diagonal directions
-			dir = 7;
+			dir = DIR_NORTHEAST;
 		} else {
-			dir = (dir+2)%8;
+			dir = ( dir + 2 ) % DIR_MAX;
 		}
 	}
 
@@ -1961,7 +1964,7 @@ bool map_closest_freecell(int16 m, int16 *x, int16 *y, int type, int flag)
 #ifndef Pandas_Fix_Item_Trade_FloorDropable
 int map_addflooritem(struct item *item, int amount, int16 m, int16 x, int16 y, int first_charid, int second_charid, int third_charid, int flags, unsigned short mob_id, bool canShowEffect)
 #else
-int map_addflooritem(struct item *item, int amount, int16 m, int16 x, int16 y, int first_charid, int second_charid, int third_charid, int flags, unsigned short mob_id, bool canShowEffect, struct map_session_data *sd)
+int map_addflooritem(struct item *item, int amount, int16 m, int16 x, int16 y, int first_charid, int second_charid, int third_charid, int flags, unsigned short mob_id, bool canShowEffect, map_session_data *sd)
 #endif // Pandas_Fix_Item_Trade_FloorDropable
 {
 	int r;
@@ -2048,7 +2051,7 @@ void map_addnickdb(int charid, const char* nick)
 	safestrncpy(p->nick, nick, sizeof(p->nick));
 
 	while( p->requests ) {
-		struct map_session_data* sd;
+		map_session_data* sd;
 		struct charid_request* req;
 		req = p->requests;
 		p->requests = req->next;
@@ -2071,7 +2074,7 @@ void map_delnickdb(int charid, const char* name)
 
 	while( p->requests ) {
 		struct charid_request* req;
-		struct map_session_data* sd;
+		map_session_data* sd;
 		req = p->requests;
 		p->requests = req->next;
 		sd = map_charid2sd(req->charid);
@@ -2085,11 +2088,11 @@ void map_delnickdb(int charid, const char* name)
 /// Notifies sd of the nick of charid.
 /// Uses the name in the character if online.
 /// Uses the name in nick_db if offline.
-void map_reqnickdb(struct map_session_data * sd, int charid)
+void map_reqnickdb(map_session_data * sd, int charid)
 {
 	struct charid2nick* p;
 	struct charid_request* req;
-	struct map_session_data* tsd;
+	map_session_data* tsd;
 
 	nullpo_retv(sd);
 
@@ -2178,13 +2181,13 @@ void map_mobiddb(struct block_list* bl, int new_blockid) {
 		idb_put(bossid_db, bl->id, bl);
 
 		struct s_mapiterator* iter = nullptr;
-		struct map_session_data* pl_sd = nullptr;
+		map_session_data* pl_sd = nullptr;
 		iter = mapit_getallusers();
 		for (pl_sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); pl_sd = (TBL_PC*)mapit_next(iter)) {
-			struct status_change* const sc = status_get_sc(&pl_sd->bl);
+			status_change* const sc = status_get_sc(&pl_sd->bl);
 			if (!sc) continue;
 
-			struct status_change_entry* const sce = sc->data[SC_BOSSMAPINFO];
+			struct status_change_entry* const sce = sc->getSCE(SC_BOSSMAPINFO);
 			if (!sce) continue;
 
 			if (sce->val1 == origin_blockid) {
@@ -2240,7 +2243,7 @@ void map_deliddb(struct block_list *bl)
 /*==========================================
  * Standard call when a player connection is closed.
  *------------------------------------------*/
-int map_quit(struct map_session_data *sd) {
+int map_quit(map_session_data *sd) {
 	int i;
 
 	if (sd->state.keepshop == false) { // Close vending/buyingstore
@@ -2297,7 +2300,7 @@ int map_quit(struct map_session_data *sd) {
 			std::bitset<SCF_MAX> &flag = it.second->flag;
 
 			//No need to save infinite status
-			if (flag[SCF_NOSAVEINFINITE] && sd->sc.data[it.first] && sd->sc.data[it.first]->val4 > 0) {
+			if (flag[SCF_NOSAVEINFINITE] && sd->sc.getSCE(it.first) && sd->sc.getSCE(it.first)->val4 > 0) {
 				status_change_end(&sd->bl, static_cast<sc_type>(it.first));
 				continue;
 			}
@@ -2338,23 +2341,6 @@ int map_quit(struct map_session_data *sd) {
 
 	unit_remove_map_pc(sd,CLR_RESPAWN);
 
-	if( mapdata->instance_id > 0 ) { // Avoid map conflicts and warnings on next login
-		int16 m;
-		struct point *pt;
-		if( mapdata->save.map )
-			pt = &mapdata->save;
-		else
-			pt = &sd->status.save_point;
-
-		if( (m=map_mapindex2mapid(pt->map)) >= 0 )
-		{
-			sd->bl.m = m;
-			sd->bl.x = pt->x;
-			sd->bl.y = pt->y;
-			sd->mapindex = pt->map;
-		}
-	}
-
 	if (sd->state.vending)
 		idb_remove(vending_getdb(), sd->status.char_id);
 
@@ -2366,6 +2352,7 @@ int map_quit(struct map_session_data *sd) {
 	pc_makesavestatus(sd);
 	pc_clean_skilltree(sd);
 	pc_crimson_marker_clear(sd);
+	pc_macro_detector_disconnect(*sd);
 	chrif_save(sd, CSAVE_QUIT|CSAVE_INVENTORY|CSAVE_CART);
 	unit_free_pc(sd);
 	return 0;
@@ -2374,9 +2361,9 @@ int map_quit(struct map_session_data *sd) {
 /*==========================================
  * Lookup, id to session (player,mob,npc,homon,merc..)
  *------------------------------------------*/
-struct map_session_data * map_id2sd(int id){
+map_session_data * map_id2sd(int id){
 	if (id <= 0) return NULL;
-	return (struct map_session_data*)idb_get(pc_db,id);
+	return (map_session_data*)idb_get(pc_db,id);
 }
 
 struct mob_data * map_id2md(int id){
@@ -2418,7 +2405,7 @@ struct chat_data* map_id2cd(int id){
 const char* map_charid2nick(int charid)
 {
 	struct charid2nick *p;
-	struct map_session_data* sd;
+	map_session_data* sd;
 
 	sd = map_charid2sd(charid);
 	if( sd )
@@ -2432,10 +2419,10 @@ const char* map_charid2nick(int charid)
 	return NULL;
 }
 
-/// Returns the struct map_session_data of the charid or NULL if the char is not online.
-struct map_session_data* map_charid2sd(int charid)
+/// Returns the map_session_data of the charid or NULL if the char is not online.
+map_session_data* map_charid2sd(int charid)
 {
-	return (struct map_session_data*)uidb_get(charid_db, charid);
+	return (map_session_data*)uidb_get(charid_db, charid);
 }
 
 /*==========================================
@@ -2443,10 +2430,10 @@ struct map_session_data* map_charid2sd(int charid)
  * (without sensitive case if necessary)
  * return map_session_data pointer or NULL
  *------------------------------------------*/
-struct map_session_data * map_nick2sd(const char *nick, bool allow_partial)
+map_session_data * map_nick2sd(const char *nick, bool allow_partial)
 {
-	struct map_session_data* sd;
-	struct map_session_data* found_sd;
+	map_session_data* sd;
+	map_session_data* found_sd;
 	struct s_mapiterator* iter;
 	size_t nicklen;
 	int qty = 0;
@@ -2571,13 +2558,13 @@ DBMap* get_bossid_db() {
 
 /// Applies func to all the players in the db.
 /// Stops iterating if func returns -1.
-void map_foreachpc(int (*func)(struct map_session_data* sd, va_list args), ...)
+void map_foreachpc(int (*func)(map_session_data* sd, va_list args), ...)
 {
 	DBIterator* iter;
-	struct map_session_data* sd;
+	map_session_data* sd;
 
 	iter = db_iterator(pc_db);
-	for( sd = (struct map_session_data*)dbi_first(iter); dbi_exists(iter); sd = (struct map_session_data*)dbi_next(iter) )
+	for( sd = (map_session_data*)dbi_first(iter); dbi_exists(iter); sd = (map_session_data*)dbi_next(iter) )
 	{
 		va_list args;
 		int ret;
@@ -2944,21 +2931,21 @@ int map_addinstancemap(int src_m, int instance_id, bool no_mapflag)
 	dst_map->npc_num_warp = 0;
 
 	// Reallocate cells
-#ifndef Pandas_LGTM_Optimization
+#ifndef Pandas_CodeAnalysis_Suggestion
 	size_t num_cell = dst_map->xs * dst_map->ys;
 #else
 	// 乘法计算时使用较大的数值类型来避免计算结果溢出: https://lgtm.com/rules/2157860313/
 	size_t num_cell = (size_t)dst_map->xs * dst_map->ys;
-#endif // Pandas_LGTM_Optimization
+#endif // Pandas_CodeAnalysis_Suggestion
 	CREATE( dst_map->cell, struct mapcell, num_cell );
 	memcpy( dst_map->cell, src_map->cell, num_cell * sizeof(struct mapcell) );
 
-#ifndef Pandas_LGTM_Optimization
+#ifndef Pandas_CodeAnalysis_Suggestion
 	size_t size = dst_map->bxs * dst_map->bys * sizeof(struct block_list*);
 #else
 	// 乘法计算时使用较大的数值类型来避免计算结果溢出: https://lgtm.com/rules/2157860313/
 	size_t size = (size_t)dst_map->bxs * dst_map->bys * sizeof(struct block_list*);
-#endif // Pandas_LGTM_Optimization
+#endif // Pandas_CodeAnalysis_Suggestion
 	dst_map->block = (struct block_list **)aCalloc(1,size);
 	dst_map->block_mob = (struct block_list **)aCalloc(1,size);
 
@@ -2981,12 +2968,12 @@ int map_addinstancemap(int src_m, int instance_id, bool no_mapflag)
  *------------------------------------------*/
 static int map_instancemap_leave(struct block_list *bl, va_list ap)
 {
-	struct map_session_data* sd;
+	map_session_data* sd;
 
 	nullpo_retr(0, bl);
-	nullpo_retr(0, sd = (struct map_session_data *)bl);
+	nullpo_retr(0, sd = (map_session_data *)bl);
 
-	pc_setpos(sd, sd->status.save_point.map, sd->status.save_point.x, sd->status.save_point.y, CLR_TELEPORT);
+	pc_setpos_savepoint( *sd );
 
 	return 1;
 }
@@ -3000,7 +2987,7 @@ static int map_instancemap_clean(struct block_list *bl, va_list ap)
 	switch(bl->type) {
 		/*case BL_PC:
 		// BL_PET, BL_HOM, BL_MER, and BL_ELEM are moved when BL_PC warped out in map_instancemap_leave
-			map_quit((struct map_session_data *) bl);
+			map_quit((map_session_data *) bl);
 			break;*/
 		case BL_NPC:
 			npc_unload((struct npc_data *)bl,true);
@@ -3259,14 +3246,14 @@ int map_check_dir(int s_dir,int t_dir)
 	if(s_dir == t_dir)
 		return 0;
 	switch(s_dir) {
-		case 0: if(t_dir == 7 || t_dir == 1 || t_dir == 0) return 0; break;
-		case 1: if(t_dir == 0 || t_dir == 2 || t_dir == 1) return 0; break;
-		case 2: if(t_dir == 1 || t_dir == 3 || t_dir == 2) return 0; break;
-		case 3: if(t_dir == 2 || t_dir == 4 || t_dir == 3) return 0; break;
-		case 4: if(t_dir == 3 || t_dir == 5 || t_dir == 4) return 0; break;
-		case 5: if(t_dir == 4 || t_dir == 6 || t_dir == 5) return 0; break;
-		case 6: if(t_dir == 5 || t_dir == 7 || t_dir == 6) return 0; break;
-		case 7: if(t_dir == 6 || t_dir == 0 || t_dir == 7) return 0; break;
+		case DIR_NORTH: if( t_dir == DIR_NORTHEAST || t_dir == DIR_NORTHWEST || t_dir == DIR_NORTH ) return 0; break;
+		case DIR_NORTHWEST: if( t_dir == DIR_NORTH || t_dir == DIR_WEST || t_dir == DIR_NORTHWEST ) return 0; break;
+		case DIR_WEST: if( t_dir == DIR_NORTHWEST || t_dir == DIR_SOUTHWEST || t_dir == DIR_WEST ) return 0; break;
+		case DIR_SOUTHWEST: if( t_dir == DIR_WEST || t_dir == DIR_SOUTH || t_dir == DIR_SOUTHWEST ) return 0; break;
+		case DIR_SOUTH: if( t_dir == DIR_SOUTHWEST || t_dir == DIR_SOUTHEAST || t_dir == DIR_SOUTH ) return 0; break;
+		case DIR_SOUTHEAST: if( t_dir == DIR_SOUTH || t_dir == DIR_EAST || t_dir == DIR_SOUTHEAST ) return 0; break;
+		case DIR_EAST: if( t_dir == DIR_SOUTHEAST || t_dir == DIR_NORTHEAST || t_dir == DIR_EAST ) return 0; break;
+		case DIR_NORTHEAST: if( t_dir == DIR_EAST || t_dir == DIR_NORTH || t_dir == DIR_NORTHEAST ) return 0; break;
 	}
 	return 1;
 }
@@ -3276,9 +3263,9 @@ int map_check_dir(int s_dir,int t_dir)
  *------------------------------------------*/
 uint8 map_calc_dir(struct block_list* src, int16 x, int16 y)
 {
-	uint8 dir = 0;
+	uint8 dir = DIR_NORTH;
 
-	nullpo_ret(src);
+	nullpo_retr( dir, src );
 
 	dir = map_calc_dir_xy(src->x, src->y, x, y, unit_getdir(src));
 
@@ -3290,7 +3277,7 @@ uint8 map_calc_dir(struct block_list* src, int16 x, int16 y)
  * Use this if you don't have a block list available to check against
  *------------------------------------------*/
 uint8 map_calc_dir_xy(int16 srcx, int16 srcy, int16 x, int16 y, uint8 srcdir) {
-	uint8 dir = 0;
+	uint8 dir = DIR_NORTH;
 	int dx, dy;
 
 	dx = x-srcx;
@@ -3299,31 +3286,31 @@ uint8 map_calc_dir_xy(int16 srcx, int16 srcy, int16 x, int16 y, uint8 srcdir) {
 	{	// both are standing on the same spot
 		// aegis-style, makes knockback default to the left
 		// athena-style, makes knockback default to behind 'src'
-		dir = (battle_config.knockback_left ? 6 : srcdir);
+		dir = ( battle_config.knockback_left ? DIR_EAST : srcdir );
 	}
 	else if( dx >= 0 && dy >=0 )
 	{	// upper-right
-		if( dx >= dy*3 )      dir = 6;	// right
-		else if( dx*3 < dy )  dir = 0;	// up
-		else                  dir = 7;	// up-right
+		if( dx >= dy*3 )      dir = DIR_EAST;	// right
+		else if( dx*3 < dy )  dir = DIR_NORTH;	// up
+		else                  dir = DIR_NORTHEAST;	// up-right
 	}
 	else if( dx >= 0 && dy <= 0 )
 	{	// lower-right
-		if( dx >= -dy*3 )     dir = 6;	// right
-		else if( dx*3 < -dy ) dir = 4;	// down
-		else                  dir = 5;	// down-right
+		if( dx >= -dy*3 )     dir = DIR_EAST;	// right
+		else if( dx*3 < -dy ) dir = DIR_SOUTH;	// down
+		else                  dir = DIR_SOUTHEAST;	// down-right
 	}
 	else if( dx <= 0 && dy <= 0 )
 	{	// lower-left
-		if( dx*3 >= dy )      dir = 4;	// down
-		else if( dx < dy*3 )  dir = 2;	// left
-		else                  dir = 3;	// down-left
+		if( dx*3 >= dy )      dir = DIR_SOUTH;	// down
+		else if( dx < dy*3 )  dir = DIR_WEST;	// left
+		else                  dir = DIR_SOUTHWEST;	// down-left
 	}
 	else
 	{	// upper-left
-		if( -dx*3 <= dy )     dir = 0;	// up
-		else if( -dx > dy*3 ) dir = 2;	// left
-		else                  dir = 1;	// up-left
+		if( -dx*3 <= dy )     dir = DIR_NORTH;	// up
+		else if( -dx > dy*3 ) dir = DIR_WEST;	// left
+		else                  dir = DIR_NORTHWEST;	// up-left
 	}
 	return dir;
 }
@@ -3541,16 +3528,16 @@ bool map_iwall_exist(const char* wall_name)
 
 void map_iwall_nextxy(int16 x, int16 y, int8 dir, int pos, int16 *x1, int16 *y1)
 {
-	if( dir == 0 || dir == 4 )
+	if( dir == DIR_NORTH || dir == DIR_SOUTH )
 		*x1 = x; // Keep X
-	else if( dir > 0 && dir < 4 )
+	else if( dir > DIR_NORTH && dir < DIR_SOUTH )
 		*x1 = x - pos; // Going left
 	else
 		*x1 = x + pos; // Going right
 
-	if( dir == 2 || dir == 6 )
+	if( dir == DIR_WEST || dir == DIR_EAST )
 		*y1 = y;
-	else if( dir > 2 && dir < 6 )
+	else if( dir > DIR_WEST && dir < DIR_EAST )
 		*y1 = y - pos;
 	else
 		*y1 = y + pos;
@@ -3601,7 +3588,7 @@ bool map_iwall_set(int16 m, int16 x, int16 y, int size, int8 dir, bool shootable
 	return true;
 }
 
-void map_iwall_get(struct map_session_data *sd) {
+void map_iwall_get(map_session_data *sd) {
 	struct iwall_data *iwall;
 	DBIterator* iter;
 	int16 x1, y1;
@@ -3970,12 +3957,12 @@ int map_readgat (struct map_data* m)
 
 	m->xs = *(int32*)(gat+6);
 	m->ys = *(int32*)(gat+10);
-#ifndef Pandas_LGTM_Optimization
+#ifndef Pandas_CodeAnalysis_Suggestion
 	num_cells = m->xs * m->ys;
 #else
 	// 乘法计算时使用较大的数值类型来避免计算结果溢出: https://lgtm.com/rules/2157860313/
 	num_cells = (size_t)m->xs * m->ys;
-#endif // Pandas_LGTM_Optimization
+#endif // Pandas_CodeAnalysis_Suggestion
 	CREATE(m->cell, struct mapcell, num_cells);
 
 	water_height = map_waterheight(m->name);
@@ -4113,12 +4100,12 @@ int map_readallmaps (void)
 		mapdata->bxs = (mapdata->xs + BLOCK_SIZE - 1) / BLOCK_SIZE;
 		mapdata->bys = (mapdata->ys + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
-#ifndef Pandas_LGTM_Optimization
+#ifndef Pandas_CodeAnalysis_Suggestion
 		size = mapdata->bxs * mapdata->bys * sizeof(struct block_list*);
 #else
 		// 乘法计算时使用较大的数值类型来避免计算结果溢出: https://lgtm.com/rules/2157860313/
 		size = (size_t)mapdata->bxs * mapdata->bys * sizeof(struct block_list*);
-#endif // Pandas_LGTM_Optimization
+#endif // Pandas_CodeAnalysis_Suggestion
 		mapdata->block = (struct block_list**)aCalloc(size, 1);
 		mapdata->block_mob = (struct block_list**)aCalloc(size, 1);
 
@@ -4168,9 +4155,8 @@ int parse_console(const char* buf){
 	int16 x = 0;
 	int16 y = 0;
 	int n;
-	struct map_session_data sd;
+	map_session_data sd;
 
-	memset(&sd, 0, sizeof(struct map_session_data));
 	strcpy(sd.status.name, "console");
 
 	if( ( n = sscanf(buf, "%63[^:]:%63[^:]:%11s %6hd %6hd[^\n]", type, command, mapname, &x, &y) ) < 5 ){
@@ -4213,7 +4199,7 @@ int parse_console(const char* buf){
 	}
 	else if( n == 2 && strcmpi("server", type) == 0 ){
 		if( strcmpi("shutdown", command) == 0 || strcmpi("exit", command) == 0 || strcmpi("quit", command) == 0 ){
-			runflag = 0;
+			global_core->signal_shutdown();
 		}
 	}
 	else if( strcmpi("ers_report", type) == 0 ){
@@ -4470,14 +4456,12 @@ int inter_config_read(const char *cfgName)
 			safestrncpy(mob_skill_table,w2,sizeof(mob_skill_table));
 		else if(strcmpi(w1,"mob_skill2_table")==0)
 			safestrncpy(mob_skill2_table,w2,sizeof(mob_skill2_table));
-		else if( strcmpi( w1, "item_cash_table" ) == 0 )
-			safestrncpy( item_cash_table, w2, sizeof(item_cash_table) );
-		else if( strcmpi( w1, "item_cash2_table" ) == 0 )
-			safestrncpy( item_cash2_table, w2, sizeof(item_cash2_table) );
 		else if( strcmpi( w1, "vending_db" ) == 0 )
 			safestrncpy( vendings_table, w2, sizeof(vendings_table) );
 		else if( strcmpi( w1, "vending_items_table" ) == 0 )
 			safestrncpy(vending_items_table, w2, sizeof(vending_items_table));
+		else if( strcmpi( w1, "partybookings_table" ) == 0 )
+			safestrncpy(partybookings_table, w2, sizeof(partybookings_table));
 		else if( strcmpi(w1, "roulette_table") == 0)
 			safestrncpy(roulette_table, w2, sizeof(roulette_table));
 		else if (strcmpi(w1, "market_table") == 0)
@@ -4711,7 +4695,7 @@ int cleanup_sub(struct block_list *bl, va_list ap)
 
 	switch(bl->type) {
 		case BL_PC:
-			map_quit((struct map_session_data *) bl);
+			map_quit((map_session_data *) bl);
 			break;
 		case BL_NPC:
 			npc_unload((struct npc_data *)bl,false);
@@ -4778,7 +4762,7 @@ void map_skill_duration_add(struct map_data *mapd, uint16 skill_id, uint16 per) 
 //************************************
 static int map_mapflag_gvg_start_sub(struct block_list* bl, va_list ap)
 {
-	struct map_session_data* sd = map_id2sd(bl->id);
+	map_session_data* sd = map_id2sd(bl->id);
 	nullpo_retr(0, sd);
 
 	// 由于扩展了 max_aspd_for_gvg 选项, 在开启了 GVG 之后
@@ -4798,7 +4782,7 @@ static int map_mapflag_gvg_start_sub(struct block_list* bl, va_list ap)
 //************************************
 static int map_mapflag_gvg_stop_sub(struct block_list* bl, va_list ap)
 {
-	struct map_session_data* sd = map_id2sd(bl->id);
+	map_session_data* sd = map_id2sd(bl->id);
 	nullpo_retr(0, sd);
 
 	// 由于扩展了 max_aspd_for_gvg 选项, 在停止了 GVG 之后
@@ -4817,7 +4801,7 @@ static int map_mapflag_gvg_stop_sub(struct block_list* bl, va_list ap)
  */
 static int map_mapflag_pvp_start_sub(struct block_list *bl, va_list ap)
 {
-	struct map_session_data *sd = map_id2sd(bl->id);
+	map_session_data *sd = map_id2sd(bl->id);
 
 	nullpo_retr(0, sd);
 
@@ -4849,7 +4833,7 @@ static int map_mapflag_pvp_start_sub(struct block_list *bl, va_list ap)
  */
 static int map_mapflag_pvp_stop_sub(struct block_list *bl, va_list ap)
 {
-	struct map_session_data* sd = map_id2sd(bl->id);
+	map_session_data* sd = map_id2sd(bl->id);
 
 	clif_pvpset(sd, 0, 0, 2);
 
@@ -5546,7 +5530,7 @@ bool map_setmapflag_sub(int16 m, enum e_mapflag mapflag, bool status, union u_ma
 	case MF_HIDEGUILDINFO:
 	{
 		struct s_mapiterator* iter = mapit_getallusers();
-		struct map_session_data* pl_sd = nullptr;
+		map_session_data* pl_sd = nullptr;
 		for (pl_sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); pl_sd = (TBL_PC*)mapit_next(iter)) {
 			if (!pl_sd || pl_sd->bl.m != m)
 				continue;
@@ -5560,7 +5544,7 @@ bool map_setmapflag_sub(int16 m, enum e_mapflag mapflag, bool status, union u_ma
 	case MF_HIDEPARTYINFO:
 	{
 		struct s_mapiterator* iter = mapit_getallusers();
-		struct map_session_data* pl_sd = nullptr;
+		map_session_data* pl_sd = nullptr;
 		for (pl_sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); pl_sd = (TBL_PC*)mapit_next(iter)) {
 			if (!pl_sd || pl_sd->bl.m != m)
 				continue;
@@ -5574,7 +5558,7 @@ bool map_setmapflag_sub(int16 m, enum e_mapflag mapflag, bool status, union u_ma
 	case MF_NOPET:
 	{
 		struct s_mapiterator* iter = mapit_getallusers();
-		struct map_session_data* pl_sd = nullptr;
+		map_session_data* pl_sd = nullptr;
 		for (pl_sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); pl_sd = (TBL_PC*)mapit_next(iter)) {
 			if (!pl_sd || pl_sd->bl.m != m)
 				continue;
@@ -5597,7 +5581,7 @@ bool map_setmapflag_sub(int16 m, enum e_mapflag mapflag, bool status, union u_ma
 	case MF_NOHOMUN:
 	{
 		struct s_mapiterator* iter = mapit_getallusers();
-		struct map_session_data* pl_sd = nullptr;
+		map_session_data* pl_sd = nullptr;
 		for (pl_sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); pl_sd = (TBL_PC*)mapit_next(iter)) {
 			if (!pl_sd || pl_sd->bl.m != m)
 				continue;
@@ -5615,7 +5599,7 @@ bool map_setmapflag_sub(int16 m, enum e_mapflag mapflag, bool status, union u_ma
 	case MF_NOMERC:
 	{
 		struct s_mapiterator* iter = mapit_getallusers();
-		struct map_session_data* pl_sd = nullptr;
+		map_session_data* pl_sd = nullptr;
 		for (pl_sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); pl_sd = (TBL_PC*)mapit_next(iter)) {
 			if (!pl_sd || pl_sd->bl.m != m)
 				continue;
@@ -5633,7 +5617,7 @@ bool map_setmapflag_sub(int16 m, enum e_mapflag mapflag, bool status, union u_ma
 	case MF_NOAURA:
 	{
 		struct s_mapiterator* iter = mapit_getallusers();
-		struct map_session_data* pl_sd = nullptr;
+		map_session_data* pl_sd = nullptr;
 		for (pl_sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); pl_sd = (TBL_PC*)mapit_next(iter)) {
 			if (!pl_sd || pl_sd->bl.m != m)
 				continue;
@@ -5674,13 +5658,13 @@ static int cleanup_db_sub(DBKey key, DBData *data, va_list va)
 /*==========================================
  * map destructor
  *------------------------------------------*/
-void do_final(void){
+void MapServer::finalize(){
 	ShowStatus("Terminating...\n");
 	channel_config.closing = true;
 
 	//Ladies and babies first.
 	struct s_mapiterator* iter = mapit_getallusers();
-	for( struct map_session_data* sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); sd = (TBL_PC*)mapit_next(iter) )
+	for( map_session_data* sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); sd = (TBL_PC*)mapit_next(iter) )
 		map_quit(sd);
 	mapit_free(iter);
 
@@ -5782,7 +5766,7 @@ void do_final(void){
 	ShowStatus("Finished.\n");
 }
 
-static int map_abort_sub(struct map_session_data* sd, va_list ap)
+static int map_abort_sub(map_session_data* sd, va_list ap)
 {
 	chrif_save(sd, CSAVE_QUIT|CSAVE_INVENTORY|CSAVE_CART);
 	return 1;
@@ -5793,8 +5777,7 @@ static int map_abort_sub(struct map_session_data* sd, va_list ap)
 // Function called when the server
 // has received a crash signal.
 //------------------------------
-void do_abort(void)
-{
+void MapServer::handle_crash(){
 	static int run = 0;
 	//Save all characters and then flush the inter-connection.
 	if (run) {
@@ -5838,14 +5821,6 @@ void display_helpscreen(bool do_exit)
 	ShowInfo("  --log-config <file>\t\tAlternative logging configuration.\n");
 	if( do_exit )
 		exit(EXIT_SUCCESS);
-}
-
-/*======================================================
- * Map-Server Init and Command-line Arguments [Valaris]
- *------------------------------------------------------*/
-void set_server_type(void)
-{
-	SERVER_TYPE = ATHENA_SERVER_MAP;
 }
 
 /*======================================================
@@ -5919,7 +5894,7 @@ int map_msg_config_read(const char *cfgName, int lang){
 	}
 	return 0;
 }
-const char* map_msg_txt(struct map_session_data *sd, int msg_number){
+const char* map_msg_txt(map_session_data *sd, int msg_number){
 	struct msg_data *mdb;
 	uint8 lang = 0; //default
 	if(sd && sd->langtype) lang = sd->langtype;
@@ -5948,6 +5923,25 @@ const char* map_msg_txt(struct map_session_data *sd, int msg_number){
 	return "??";
 }
 
+#if defined(Pandas_UserExperience_Rewrite_MapServerGenerator_Args_Process) && defined(MAP_GENERATOR)
+//************************************
+// Method:      mapgenerator_show_help
+// Description: 打印生成器的命令行帮助信息
+// Returns:     void
+// Author:      Sola丶小克(CairoLee)  2022/12/04 18:56
+//************************************
+void mapgenerator_show_help() {
+	ShowInfo("Usage: %s [options]\n", "map-server-generator");
+	ShowInfo("Options:\n");
+	ShowInfo("  -?, -h [--help]\tShow this help message\n");
+	ShowInfo("  -n, -navi [--generate-navi]\tCreate navigation files\n");
+	ShowInfo("  -r, -repu [--generate-reputation]\tCreate reputation bson files\n");
+	ShowInfo("  -i, -imi [--generate-itemmoveinfo]\tCreate itemmoveinfov5.txt\n");
+	printf("\n");
+	systemPause();
+}
+#endif // defined(Pandas_UserExperience_Rewrite_MapServerGenerator_Args_Process) && defined(MAP_GENERATOR)
+
 /**
  * Read the option specified in command line
  *  and assign the confs used by the different server.
@@ -5957,6 +5951,7 @@ const char* map_msg_txt(struct map_session_data *sd, int msg_number){
  */
 int mapgenerator_get_options(int argc, char** argv) {
 #ifdef MAP_GENERATOR
+#ifndef Pandas_UserExperience_Rewrite_MapServerGenerator_Args_Process
 	bool optionSet = false;
 	for (int i = 1; i < argc; i++) {
 		const char *arg = argv[i];
@@ -5966,6 +5961,10 @@ int mapgenerator_get_options(int argc, char** argv) {
 
 			if (strcmp(arg, "generate-navi") == 0) {
 				gen_options.navi = true;
+			} else if (strcmp(arg, "generate-itemmoveinfo") == 0) {
+				gen_options.itemmoveinfo = true;
+			} else if (strcmp(arg, "generate-reputation") == 0) {
+				gen_options.reputation = true;
 			} else {
 				// pass through to default get_options
 				continue;
@@ -5980,35 +5979,95 @@ int mapgenerator_get_options(int argc, char** argv) {
 		ShowError("No options passed to the map generator, you must set at least one.\n");
 		exit(1);
 	}
+#else
+	bool optionSet = false;
+	for (int i = 1; i < argc; i++) {
+		const char* arg = argv[i];
+		if (arg[0] != '-' && (arg[0] != '/' || arg[1] == '-')) {// -, -- and /
+			ShowError("Unknown option '%s'.\n", argv[i]);
+			exit(EXIT_FAILURE);
+		} else if (arg[0] == '/' || (++arg)[0] == '-') {// long option
+			arg++;
+
+			if (strcmp(arg, "help") == 0) {
+				gen_options.showhelp = optionSet = true;
+				argv[i] = nullptr;
+			} else if (strcmp(arg, "generate-navi") == 0 || strcmp(arg, "navi") == 0) {
+				gen_options.navi = optionSet = true;
+				argv[i] = nullptr;
+			} else if (strcmp(arg, "generate-itemmoveinfo") == 0 || strcmp(arg, "itemmoveinfo") == 0 || strcmp(arg, "imi") == 0) {
+				gen_options.itemmoveinfo = optionSet = true;
+				argv[i] = nullptr;
+			} else if (strcmp(arg, "generate-reputation") == 0 || strcmp(arg, "repu") == 0) {
+				gen_options.reputation = optionSet = true;
+				argv[i] = nullptr;
+			}
+			else {
+				ShowError("Unknown option '%s'.\n", argv[i]);
+				exit(EXIT_FAILURE);
+			}
+		}
+		else {
+			switch (arg[0]) {// short option
+			case '?':
+			case 'h':
+				gen_options.showhelp = optionSet = true;
+				argv[i] = nullptr;
+				break;
+			case 'n':
+				gen_options.navi = optionSet = true;
+				argv[i] = nullptr;
+				break;
+			case 'i':
+				gen_options.itemmoveinfo = optionSet = true;
+				argv[i] = nullptr;
+				break;
+			case 'r':
+				gen_options.reputation = optionSet = true;
+				argv[i] = nullptr;
+				break;
+			default:
+				ShowError("Unknown option '%s'.\n", argv[i]);
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
+	
+	if (!optionSet) {
+		ShowWarning("No options passed to the map generator, you must set at least one.\n");
+		mapgenerator_show_help();
+		exit(EXIT_FAILURE);
+	}
+	
+	if (gen_options.showhelp) {
+		mapgenerator_show_help();
+		exit(EXIT_SUCCESS);
+	}
+#endif // Pandas_UserExperience_Rewrite_MapServerGenerator_Args_Process
 #endif
 	return 1;
 }
 
 /// Called when a terminate signal is received.
-void do_shutdown(void)
-{
-	if( runflag != MAPSERVER_ST_SHUTDOWN )
-	{
-		runflag = MAPSERVER_ST_SHUTDOWN;
-		ShowStatus("Shutting down...\n");
+void MapServer::handle_shutdown(){
+	ShowStatus("Shutting down...\n");
+
 #ifdef Pandas_Crashfix_Prevent_NullPointer
-		if (pc_db)
-#endif // Pandas_Crashfix_Prevent_NullPointer
-		{
-			struct map_session_data* sd;
-			struct s_mapiterator* iter = mapit_getallusers();
-			for( sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); sd = (TBL_PC*)mapit_next(iter) )
-				clif_GM_kick(NULL, sd);
-			mapit_free(iter);
+		if (!pc_db) {
 			flush_fifos();
+			return;
 		}
-		chrif_check_shutdown();
-	}
+#endif // Pandas_Crashfix_Prevent_NullPointer
+
+	map_session_data* sd;
+	struct s_mapiterator* iter = mapit_getallusers();
+	for( sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); sd = (TBL_PC*)mapit_next(iter) )
+		clif_GM_kick(NULL, sd);
+	mapit_free(iter);
+	flush_fifos();
 }
 
-int do_init(int argc, char *argv[])
-{
-	runflag = MAPSERVER_ST_STARTING;
+bool MapServer::initialize( int argc, char *argv[] ){
 #ifdef GCOLLECT
 	GC_enable_incremental();
 #endif
@@ -6042,11 +6101,6 @@ int do_init(int argc, char *argv[])
 	/* Multilanguage */
 #endif // Pandas_Message_Reorganize
 
-	// Default map
-	safestrncpy(map_default.mapname, "prontera", MAP_NAME_LENGTH);
-	map_default.x = 156;
-	map_default.y = 191;
-
 	// default inter_config
 	inter_config.start_status_points = 48;
 	inter_config.emblem_woe_change = true;
@@ -6072,10 +6126,9 @@ int do_init(int argc, char *argv[])
 		char ip_str[16];
 		ip2str(addr_[0], ip_str);
 
-		// Skip this warning if the server is run with run-once flag
-		if( runflag != CORE_ST_STOP ){
-			ShowWarning("Not all IP addresses in map_athena.conf configured, autodetecting...\n");
-		}
+#if !defined(BUILDBOT)
+		ShowWarning( "Not all IP addresses in map_athena.conf configured, autodetecting...\n" );
+#endif
 
 		if (naddr_ == 0)
 			ShowError("Unable to determine your IP address...\n");
@@ -6181,23 +6234,37 @@ int do_init(int argc, char *argv[])
 		ShowStatus("The Map-server is " CL_GREEN "ready" CL_RESET " (Server is listening on the port %u, took %" PRIu64 " milliseconds).\n\n", map_port, performance_get_milliseconds("core_init"));
 	#endif // Pandas_Speedup_Print_TimeConsuming_Of_KeySteps
 #else
+
+#ifdef Pandas_UserExperience_MapServerGenerator_Output
+	ShowInfo("----------------------------------------------------------------------\n");
+	ShowInfo("- MAP GENERATOR START WORKING\n");
+	ShowInfo("----------------------------------------------------------------------\n");
+#endif // Pandas_UserExperience_MapServerGenerator_Output
+	
 	// depending on gen_options, generate the correct things
 	if (gen_options.navi)
 		navi_create_lists();
-	runflag = CORE_ST_STOP;
-#endif
+	if (gen_options.itemmoveinfo)
+		itemdb_gen_itemmoveinfo();
+	if (gen_options.reputation)
+		pc_reputation_generate();
+	this->signal_shutdown();
 
-	if( runflag != CORE_ST_STOP )
-	{
-		shutdown_callback = do_shutdown;
-		runflag = MAPSERVER_ST_RUNNING;
-	}
+#ifdef Pandas_UserExperience_MapServerGenerator_Output
+	ShowInfo("----------------------------------------------------------------------\n");
+	ShowInfo("- MAP GENERATOR WORK FINISHED\n");
+	ShowInfo("----------------------------------------------------------------------\n");
+#endif // Pandas_UserExperience_MapServerGenerator_Output
+#endif
 
 	if( console ){ //start listening
 		add_timer_func_list(parse_console_timer, "parse_console_timer");
 		add_timer_interval(gettick()+1000, parse_console_timer, 0, 0, 1000); //start in 1s each 1sec
 	}
 
-	return 0;
+	return true;
 }
 
+int main( int argc, char *argv[] ){
+	return main_core<MapServer>( argc, argv );
+}

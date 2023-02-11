@@ -4,6 +4,7 @@
 #include "merchantstore_controller.hpp"
 
 #include <string>
+#include <nlohmann/json.hpp>
 
 #include "../common/showmsg.hpp"
 #include "../common/sql.hpp"
@@ -34,10 +35,8 @@ HANDLER_FUNC(merchantstore_save) {
 
 	if (req.has_file("data")) {
 		data = req.get_file_value("data").content;
-		addToJsonObject(data, "\"Type\": 1");
-	} else {
-		data = "{\"Type\": 1}";
 	}
+
 	SQLLock sl(WEB_SQL_LOCK);
 	sl.lock();
 	auto handle = sl.getHandle();
@@ -169,7 +168,9 @@ HANDLER_FUNC(merchantstore_load) {
 	sl.unlock();
 
 	databuf[sizeof(databuf) - 1] = 0;
-	res.set_content(databuf, "application/json");
+	auto response = nlohmann::json::parse(databuf);
+	response["Type"] = 1;
+	res.set_content(response.dump(), "application/json");
 }
 
 #else
@@ -196,8 +197,13 @@ HANDLER_FUNC(merchantstore_save) {
 	auto store_type = GET_NUMBER_FIELD("Type", 0);
 	auto data = GET_STRING_FIELD("data", "");
 
+	if (world_name.length() > WORLD_NAME_LENGTH) {
+		make_response(res, FAILURE_RET, "The world name length exceeds limit.");
+		return;
+	}
+
 	if (!isVaildCharacter(account_id, char_id)) {
-		make_response(res, 3, "The character specified by the \"GID\" does not exist in the account.");
+		make_response(res, 3, "The character specified by the \"GID\" does not exist.");
 		return;
 	}
 
@@ -270,8 +276,13 @@ HANDLER_FUNC(merchantstore_load) {
 	auto world_name = GET_STRING_FIELD("WorldName", "");
 	auto store_type = GET_NUMBER_FIELD("Type", 0);
 
+	if (world_name.length() > WORLD_NAME_LENGTH) {
+		make_response(res, FAILURE_RET, "The world name length exceeds limit.");
+		return;
+	}
+
 	if (!isVaildCharacter(account_id, char_id)) {
-		make_response(res, FAILURE_RET, "The character specified by the \"GID\" does not exist in the account.");
+		make_response(res, FAILURE_RET, "The character specified by the \"GID\" does not exist.");
 		return;
 	}
 

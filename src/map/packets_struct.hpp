@@ -4704,7 +4704,23 @@ struct PACKET_ZC_PERSONAL_INFOMATION {
 	struct PACKET_ZC_PERSONAL_INFOMATION_SUB details[];
 } __attribute__((packed));
 DEFINE_PACKET_HEADER(ZC_PERSONAL_INFOMATION, 0x097b);
-#endif  // PACKETVER_MAIN_NUM >= 20120503 || PACKETVER_RE_NUM >= 20120502 || defined(PACKETVER_ZERO)
+#elif PACKETVER_MAIN_NUM >= 20110627 || PACKETVER_RE_NUM >= 20110628
+struct PACKET_ZC_PERSONAL_INFOMATION_SUB {
+	int8 type;
+	int16 exp;
+	int16 death;
+	int16 drop;
+} __attribute__((packed));
+struct PACKET_ZC_PERSONAL_INFOMATION {
+	int16 packetType;
+	int16 length;
+	int16 total_exp;
+	int16 total_death;
+	int16 total_drop;
+	struct PACKET_ZC_PERSONAL_INFOMATION_SUB details[];
+} __attribute__((packed));
+DEFINE_PACKET_HEADER(ZC_PERSONAL_INFOMATION, 0x08cb);
+#endif // PACKETVER_MAIN_NUM >= 20110627 || PACKETVER_RE_NUM >= 20110628
 
 struct PACKET_CZ_REQUEST_ACTNPC {
 	int16 packetType;
@@ -5000,7 +5016,7 @@ DEFINE_PACKET_HEADER(ZC_MYGUILD_BASIC_INFO, 0x014c);
 struct PACKET_CZ_REQ_UPLOAD_MACRO_DETECTOR {
 	int16 PacketType;
 	char answer[16];
-	int16 imageSize;
+	uint16 imageSize;
 } __attribute__((packed));
 DEFINE_PACKET_HEADER(CZ_REQ_UPLOAD_MACRO_DETECTOR, 0x0a52);
 #endif
@@ -5050,7 +5066,7 @@ DEFINE_PACKET_HEADER(ZC_ACK_APPLY_MACRO_DETECTOR, 0x0a57);
 #if PACKETVER >= 20160330
 struct PACKET_ZC_APPLY_MACRO_DETECTOR {
 	int16 PacketType;
-	int16 imageSize;
+	uint16 imageSize;
 	char captchaKey[4];
 } __attribute__((packed));
 DEFINE_PACKET_HEADER(ZC_APPLY_MACRO_DETECTOR, 0x0a58);
@@ -5110,7 +5126,7 @@ DEFINE_PACKET_HEADER(CZ_REQ_PREVIEW_MACRO_DETECTOR, 0x0a69);
 struct PACKET_ZC_ACK_PREVIEW_MACRO_DETECTOR {
 	int16 PacketType;
 	int captchaFlag;
-	int16 imageSize;
+	uint16 imageSize;
 	char captchaKey[4];
 } __attribute__((packed));
 DEFINE_PACKET_HEADER(ZC_ACK_PREVIEW_MACRO_DETECTOR, 0x0a6a);
@@ -5685,42 +5701,6 @@ struct PACKET_ZC_DISAPPEAR_BUYING_STORE_ENTRY {
 } __attribute__((packed));
 DEFINE_PACKET_HEADER(ZC_DISAPPEAR_BUYING_STORE_ENTRY, 0x0816);
 #endif
-
-#ifdef Pandas_PacketFunction_PartyJoinRequest
-struct PACKET_CZ_PARTY_REQUEST_TO_JOIN {
-	int16 packetType;
-	uint32 partyleader_char_id;				// 申请者角色编号
-	uint32 partyleader_account_id;			// 申请者账号编号
-} __attribute__((packed));
-DEFINE_PACKET_HEADER(CZ_PARTY_REQUEST_TO_JOIN, 0x0ae6);
-
-struct PACKET_ZC_PARTY_REQUEST_APPROVAL {
-	int16 packetType;
-	uint32 applicant_account_id;			// 申请者账号编号
-	uint32 applicant_char_id;				// 申请者角色编号
-	char applicant_name[NAME_LENGTH];		// 申请者角色名称
-	int16 applicant_level;					// 申请者基础等级
-	int16 applicant_jobid;					// 申请者职业编号
-} __attribute__((packed));
-DEFINE_PACKET_HEADER(ZC_PARTY_REQUEST_APPROVAL, 0x0ae7);
-
-struct PACKET_CZ_PARTY_APPROVAL_RESULT {
-	int16 packetType;
-	uint32 partyleader_account_id;			// 队长账号编号
-	uint32 partyleader_char_id;				// 队长角色编号
-	int8 result;							// 返回值 (1 - 接受 | 0 - 拒绝/关闭)
-} __attribute__((packed));
-DEFINE_PACKET_HEADER(CZ_PARTY_APPROVAL_RESULT, 0x0af8);
-
-struct PACKET_ZC_JOIN_PARTY_REPLY {
-	int16 packetType;
-	char player_name[NAME_LENGTH];			// 申请者角色名称
-	char party_name[NAME_LENGTH];			// 队伍名称
-	uint32 unknow = 0;						// 占位字段, 用途暂未可知. 当 result 为 9 的时候客户端会使用它
-	uint32 result;							// 响应信息的类型编号, 信息定义请参考 e_party_join_reply
-} __attribute__((packed));
-DEFINE_PACKET_HEADER(ZC_JOIN_PARTY_REPLY, 0x0afa);
-#endif // Pandas_PacketFunction_PartyJoinRequest
 
 #if !defined(sun) && (!defined(__NETBSD__) || __NetBSD_Version__ >= 600000000) // NetBSD 5 and Solaris don't like pragma pack but accept the packed attribute
 #pragma pack(pop)

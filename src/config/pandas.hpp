@@ -67,7 +67,7 @@
 	//         ^ 此处第四段为 1 表示这是一个 1.0.2 的开发版本 (develop)
 	// 
 	// 在 Windows 环境下, 程序启动时会根据第四段的值自动携带对应的版本后缀, 以便进行版本区分
-	#define Pandas_Version "1.1.18.0"
+	#define Pandas_Version "1.1.19.0"
 
 	// 在启动时显示 Pandas 的 LOGO
 	#define Pandas_Show_Logo
@@ -81,8 +81,9 @@
 	// 是否启用一些杂乱的自定义辅助函数
 	#define Pandas_Helper_Common_Function
 
-	// 是否启用 LGTM 或 CodeQL 建议的处理措施, 避免潜在风险
-	#define Pandas_LGTM_Optimization
+	// 是否启用代码分析工具所建议的处理措施以避免潜在风险
+	// 包含的工具有: LGTM, CodeQL, Microsoft Code Analysis 等
+	#define Pandas_CodeAnalysis_Suggestion
 #endif // Pandas_Basic
 
 // ============================================================================
@@ -188,10 +189,6 @@
 
 	// 以下选项开关需要依赖 Pandas_Struct_Mob_Data_Pandas 的拓展
 	#ifdef Pandas_Struct_Mob_Data_Pandas
-		// 使 mob_data 结构体可记录此魔物的 damagetaken 承伤倍率 [Sola丶小克]
-		// 结构体修改定位 mob.hpp -> mob_data.pandas.damagetaken
-		#define Pandas_Struct_Mob_Data_DamageTaken
-
 		// 使 mob_data 结构体可记录此魔物被 setunitdata 修改过哪些项目 [Sola丶小克]
 		// 结构体修改定位 mob.hpp -> mob_data.pandas.special_setunitdata
 		#define Pandas_Struct_Mob_Data_Special_SetUnitData
@@ -441,10 +438,6 @@
 	// 新增的 caller 参数用来标记调用这个函数的调用者是谁, 以便在必要情况下能够调整返回给客户端的字段值
 	#define Pandas_FuncParams_Clif_Item_Equip
 
-	// 调整 mob.cpp 的 mob_getdroprate 函数增加 md 参数 [Sola丶小克]
-	// 新增的 md 参数用于在 mob_getdroprate 进行掉率计算时能根据魔物实例进行必要调整
-	#define Pandas_FuncParams_Mob_GetDroprate
-
 	// 在 mob.cpp 中的 mob_once_spawn_sub 增加 spawn_flag 参数 [Sola丶小克]
 	// 新增的 spawn_flag 参数可以用来控制召唤出来的魔物是不是 BOSS (可以被 BOSS 雷达探测)
 	#define Pandas_FuncDefine_Mob_Once_Spawn_Sub
@@ -470,11 +463,7 @@
 // ============================================================================
 
 #ifdef Pandas_PacketFunction
-	// 是否实现冒险家中介所相关的封包处理函数 [Sola丶小克]
-	// 用于响应客户端中冒险者中介所的加入队伍请求, 包含了队长进行确认的相关逻辑
-	#if PACKETVER >= 20200300
-		#define Pandas_PacketFunction_PartyJoinRequest
-	#endif // PACKETVER >= 20200300
+	// 没有什么需要修改
 #endif // Pandas_PacketFunction
 
 // ============================================================================
@@ -854,10 +843,6 @@
 	// 目前根据各位脚本大神的反馈, 更希望各个商店 NPC 的商品列表内容是各自独立的 [Sola丶小克]
 	#define Pandas_Fix_Duplicate_Shop_With_FullyShopItemList
 
-	// 修正使用 pointshop 类型的商店操作 #CASHPOINTS 或 #KAFRAPOINTS 变量完成最终的货币结算后
-	// 小地图旁边的"道具商城"按钮中的金额不被更新, 最终导致双花的问题 [Sola丶小克]
-	#define Pandas_Fix_PointShop_Double_Spend_Attack
-
 	// 修正 npc_unloadfile 和 npc_parsesrcfile 的行为会被空格影响的问题 [Sola丶小克]
 	// 如果 @reloadnpc 时给定的路径带空格, 系统将无法正确的 unloadnpc, 导致 npc 重复出现
 	#define Pandas_Fix_NPC_Filepath_WhiteSpace_Effects
@@ -1005,6 +990,34 @@
 	// 修正 sprintf 脚本指令无法格式化 int64 数值的问题 [Sola丶小克]
 	// 注意: 即使启用此选项, 当你需要格式化 int64 的数值时依然需要使用 %lld 而不是 %d
 	#define Pandas_Fix_Sprintf_ScriptCommand_Unsupport_Int64
+
+	// 修正 setunitdata 对魔物的部分属性调整会继承到魔物下一次重生的问题 [Sola丶小克]
+	// 
+	// 当一个魔物是由自然刷怪点刷新出来的话, 杀死它并不会导致 md 的数据被清空,
+	// 而是会被设置一个重生时间 (spawn_timer), 下次重生的时候还会携带上次 setunitdata 时候的信息.
+	// 因此, 若魔物的某个属性可以在 setunitdata 中被修改,
+	// 且保存其值的变量不在 md->base_status 结构体中, 那么需要手动重置一下.
+	//
+	// 备注: md->base_status 结构体中的属性在魔物重生时在 status_calc_mob_ 中被重置,
+	// 因此我们不需要手动重置 md->base_status 结构体中的这些属性.
+	//
+	// 已知 UMOB_MASTERAID 在 mob_spawn 中故意不重置
+	//
+	// 特别感谢 "差记性的小北" 指出此问题
+	#define Pandas_Fix_SetUnitData_Forget_Reset_After_Monster_Dead
+
+	// 修正玩家在 prompt 菜单中选择取消后,
+	// 后续脚本中若调用 close 系列指令会导致报错的问题 [Sola丶小克]
+	//
+	// 特别感谢 "差记性的小北" 指出此问题
+	#define Pandas_Fix_Prompt_Cancel_Combine_Close_Error
+
+	// 修正脚本控制的商店在特定情况下存在的报错问题 [Sola丶小克]
+	// 只要在 npcshopattach + callshop 之前调用了一个 mes 并且不 close 它,
+	// 那么当玩家完成商店中的交易操作后就会出现 npc_scriptcont 报错.
+	//
+	// 特别感谢 "HongShin" 指出此问题
+	#define Pandas_Fix_ScriptControl_Shop_Missing_NpcID_Error
 #endif // Pandas_Bugfix
 
 // ============================================================================
@@ -1280,6 +1293,12 @@
 
 	// 使 map-server-generator 能在运行时按需自动创建输出目录 [Sola丶小克]
 	#define Pandas_UserExperience_AutoCreate_Generated_Directory
+
+	// 改写 map-server-generator 的参数处理流程, 支持短参数以及输出帮助 [Sola丶小克]
+	#define Pandas_UserExperience_Rewrite_MapServerGenerator_Args_Process
+
+	// 优化 map-server-generator 的输出信息 [Sola丶小克]
+	#define Pandas_UserExperience_MapServerGenerator_Output
 #endif // Pandas_UserExperience
 
 // ============================================================================
@@ -1711,10 +1730,6 @@
 	// 是否启用 reloadlaphinedb 管理员指令 [Sola丶小克]
 	// 重新加载 Laphine 数据库 (laphine_synthesis.yml 和 laphine_upgrade.yml)
 	#define Pandas_AtCommand_ReloadLaphineDB
-
-	// 是否启用 reloadbarterdb 管理员指令 [Sola丶小克]
-	// 重新加载 Barters 以物易物数据库 (barters.yml)
-	#define Pandas_AtCommand_ReloadBarterDB
 	// PYHELP - ATCMD - INSERT POINT - <Section 1>
 #endif // Pandas_AtCommands
 
@@ -1824,7 +1839,7 @@
 	#define Pandas_ScriptCommand_InstanceUsers
 
 	// 是否启用 cap 脚本指令 [Sola丶小克]
-	// 确保数值不低于给定的最小值, 不超过给定的最大值
+	// 由于 rAthena 已经实现 cap_value 指令, 这里兼容老版本 cap 指令
 	#define Pandas_ScriptCommand_CapValue
 
 	// 是否启用 mobremove 脚本指令 [Sola丶小克]
@@ -2222,12 +2237,14 @@
 	// 是否拓展 getiteminfo 脚本指令的可用参数 [Sola丶小克]
 	#define Pandas_ScriptParams_GetItemInfo
 
-	// 是否拓展 setunitdata / getunitdata 指令的参数
-	// 使之能设置或者读取指定魔物实例的承伤倍率 (DamageTaken) [Sola丶小克]
-	// 此选项依赖 Pandas_Struct_Mob_Data_DamageTaken 的拓展
-	#ifdef Pandas_Struct_Mob_Data_DamageTaken
-		#define Pandas_ScriptParams_UnitData_DamageTaken
-	#endif // Pandas_Struct_Mob_Data_DamageTaken
+	// 是否拓展 getunitdata 指令的参数
+	// 使之能读取指定魔物在 DB 中设置的承伤倍率 (UMOB_DAMAGETAKEN_DB) [Sola丶小克]
+	#define Pandas_ScriptParams_DamageTaken_From_Database
+
+	// 是否扩展 setunitdata / getunitdata 指令的参数
+	// 使 UMOB_DAMAGETAKEN 能支持 -1 的值, 表示采用 DB 中设置的承伤倍率 [Sola丶小克]
+	// 该选项主要为了兼容旧版本熊猫模拟器的用户可能已经使用了 -1 值的情况
+	#define Pandas_ScriptParams_DamageTaken_Extend
 
 	// 是否拓展 setunitdata / getunitdata 指令的参数
 	// 使之能设置或者读取指定魔物实例的经验值 (BASEEXP / JOBEXP) [人鱼姬的思念]
@@ -2265,10 +2282,6 @@
 	#ifdef Pandas_WebServer_Database_EncodingAdaptive
 		#define Pandas_WebServer_Rewrite_Controller_HandlerFunc
 	#endif // Pandas_WebServer_Database_EncodingAdaptive
-
-	// 实现用于冒险家中介所的 party 接口 [Sola丶小克]
-	// 启用后将支持 /party/{list|get|add|del|search} 这几个相关接口
-	#define Pandas_WebServer_Implement_PartyRecruitment
 
 	// 在执行 logger 日志函数时是否在内部进行互斥处理 [Sola丶小克]
 	// 
