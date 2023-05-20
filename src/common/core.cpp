@@ -3,7 +3,7 @@
 
 #include "core.hpp"
 
-#include "../config/core.hpp"
+#include <config/core.hpp>
 
 #ifndef MINICORE
 #include "database.hpp"
@@ -29,8 +29,8 @@
 #include "future.hpp"
 
 #ifndef DEPRECATED_COMPILER_SUPPORT
-	#if defined( _MSC_VER ) && _MSC_VER < 1900
-		#error "Visual Studio versions older than Visual Studio 2015 are not officially supported anymore"
+	#if defined( _MSC_VER ) && _MSC_VER < 1910
+		#error "Visual Studio versions older than Visual Studio 2017 are not officially supported anymore"
 	#elif defined( __clang__ ) && __clang_major__ < 6
 		#error "clang versions older than clang 6.0 are not officially supported anymore"
 	#elif !defined( __clang__ ) && defined( __GNUC__ ) && __GNUC__ < 5
@@ -602,8 +602,13 @@ void Core::signal_crash(){
 		this->handle_crash();
 	}
 
+#ifndef Pandas_Google_Breakpad
+	// 若已经启用了 Breakpad 那么此处无需执行退出,
+	// 否则将会导致无法正常生成崩溃转储文件
+
 	// Now stop the process
 	exit( EXIT_FAILURE );
+#endif // Pandas_Google_Breakpad
 }
 
 void Core::signal_shutdown(){

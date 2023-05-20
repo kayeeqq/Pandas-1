@@ -10,19 +10,19 @@
 #include <cstring>
 #include <ctime>
 
-#include "../common/cbasetypes.hpp"
-#include "../common/conf.hpp"
-#include "../common/ers.hpp"
-#include "../common/grfio.hpp"
-#include "../common/malloc.hpp"
-#include "../common/nullpo.hpp"
-#include "../common/random.hpp"
-#include "../common/showmsg.hpp"
-#include "../common/socket.hpp"
-#include "../common/strlib.hpp"
-#include "../common/timer.hpp"
-#include "../common/utilities.hpp"
-#include "../common/utils.hpp"
+#include <common/cbasetypes.hpp>
+#include <common/conf.hpp>
+#include <common/ers.hpp>
+#include <common/grfio.hpp>
+#include <common/malloc.hpp>
+#include <common/nullpo.hpp>
+#include <common/random.hpp>
+#include <common/showmsg.hpp>
+#include <common/socket.hpp>
+#include <common/strlib.hpp>
+#include <common/timer.hpp>
+#include <common/utilities.hpp>
+#include <common/utils.hpp>
 
 #include "achievement.hpp"
 #include "atcommand.hpp"
@@ -402,9 +402,14 @@ static inline unsigned char clif_bl_type(struct block_list *bl, bool walking) {
 // There is one exception and this is if they are walking.
 // Since walking NPCs are not supported on official servers, the client does not know how to handle it.
 #if PACKETVER >= 20170726
-					return ( pcdb_checkid(status_get_viewdata(bl)->class_) && walking ) ? 0x0 : 0xC; // New walking NPC type
+		if (pcdb_checkid( status_get_viewdata( bl )->class_ ) && walking)
+			return 0x0;
+		else if (mobdb_checkid( status_get_viewdata( bl )->class_ ))	// FIXME: categorize NPCs able to walk
+			return 0xC;
+		else
+			return 0x6;
 #else
-				   return pcdb_checkid(status_get_viewdata(bl)->class_) ? 0x0 : 0x6; //NPC_EVT_TYPE
+		return pcdb_checkid(status_get_viewdata(bl)->class_) ? 0x0 : 0x6; //NPC_EVT_TYPE
 #endif
 	case BL_PET:   return pcdb_checkid(status_get_viewdata(bl)->class_)?0x0:0x7; //NPC_PET_TYPE
 	case BL_HOM:   return 0x8; //NPC_HOM_TYPE
@@ -1098,7 +1103,13 @@ static TIMER_FUNC(clif_clearunit_delayed_sub){
 void clif_clearunit_delayed(struct block_list* bl, clr_type type, t_tick tick)
 {
 	struct block_list *tbl = ers_alloc(delay_clearunit_ers, struct block_list);
-	memcpy (tbl, bl, sizeof (struct block_list));
+	tbl->next = nullptr;
+	tbl->prev = nullptr;
+	tbl->id = bl->id;
+	tbl->m = bl->m;
+	tbl->x = bl->x;
+	tbl->y = bl->y;
+	tbl->type = BL_NUL;
 	add_timer(tick, clif_clearunit_delayed_sub, (int)type, (intptr_t)tbl);
 }
 
@@ -1876,7 +1887,7 @@ static inline bool clif_npc_mayapurple(block_list *bl) {
 		npc_data *nd = map_id2nd(bl->id);
 
 		// TODO: Confirm if waitingroom cause any special cases
-		if (/* nd->chat_id == 0 && */ nd->sc.option & OPTION_INVISIBLE)
+		if (/* nd->chat_id == 0 && */ nd->is_invisible)
 			return true;
 	}
 
@@ -2083,7 +2094,7 @@ void clif_send_homdata(map_session_data *sd, int state, int param)
 	int fd = sd->fd;
 
 	if ( (state == SP_INTIMATE) && (param >= 910) && (sd->hd->homunculus.class_ == sd->hd->homunculusDB->evo_class) )
-		hom_calc_skilltree(sd->hd, 0);
+		hom_calc_skilltree(sd->hd);
 
 	WFIFOHEAD(fd, packet_len(0x230));
 	WFIFOW(fd,0)=0x230;
@@ -2362,6 +2373,11 @@ void clif_changemapserver(map_session_data* sd, const char* map, int x, int y, u
 #if PACKETVER >= 20170315
 	memset(WFIFOP(fd, 28), 0, 128); // Unknown
 #endif
+#ifdef DEBUG
+	ShowDebug(
+		"Sending the client (%d %d.%d.%d.%d) to map-server with ip %d.%d.%d.%d and port %hu\n",
+		sd->status.account_id, CONVIP(session[fd]->client_addr), CONVIP(ip), port);
+#endif
 	WFIFOSET(fd,packet_len(cmd));
 }
 
@@ -2584,7 +2600,7 @@ void clif_npc_market_purchase_ack( map_session_data *sd, e_purchase_result res, 
 	p->result = ( res == e_purchase_result::PURCHASE_SUCCEED ? 1 : 0 );
 #endif
 
-	if( p->result ){
+	if( res == e_purchase_result::PURCHASE_SUCCEED ){
 		for( int i = 0, j, count = 0; i < list.size(); i++ ){
 			ARR_FIND( 0, nd->u.shop.count, j, list[i].nameid == nd->u.shop.shop_item[j].nameid );
 
@@ -3713,7 +3729,7 @@ void clif_parse_guild_castle_teleport_request(int fd, map_session_data* sd){
 			break;
 	}
 
-	if (zeny && pc_payzeny(sd, zeny, LOG_TYPE_OTHER, nullptr)) {
+	if (zeny && pc_payzeny(sd, zeny, LOG_TYPE_OTHER)) {
 		clif_guild_castle_teleport_res(*sd, SIEGE_TP_NOT_ENOUGH_ZENY);
 		return;
 	}
@@ -4313,6 +4329,8 @@ void clif_changelook(struct block_list *bl, int type, int val) {
 		target = SELF;
 
 #if PACKETVER < 4
+	if (target != SELF && bl->type == BL_NPC && (((TBL_NPC*)bl)->is_invisible))
+		target = SELF;
 	clif_sprite_change(bl, bl->id, type, val, 0, target);
 #else
 	if (bl->type != BL_NPC) {
@@ -6005,7 +6023,7 @@ int clif_outsight(struct block_list *bl,va_list ap)
 			clif_clearchar_skillunit((struct skill_unit *)bl,tsd->fd);
 			break;
 		case BL_NPC:
-			if(!(((TBL_NPC*)bl)->sc.option&OPTION_INVISIBLE))
+			if(!(((TBL_NPC*)bl)->is_invisible))
 				clif_clearunit_single(bl->id,CLR_OUTSIGHT,tsd->fd);
 			break;
 		default:
@@ -6019,7 +6037,7 @@ int clif_outsight(struct block_list *bl,va_list ap)
 		if(tbl->type == BL_SKILL) //Trap knocked out of sight
 			clif_clearchar_skillunit((struct skill_unit *)tbl,sd->fd);
 		else if(((vd=status_get_viewdata(tbl)) && vd->class_ != JT_INVISIBLE) &&
-			!(tbl->type == BL_NPC && (((TBL_NPC*)tbl)->sc.option&OPTION_INVISIBLE)))
+			!(tbl->type == BL_NPC && (((TBL_NPC*)tbl)->is_invisible)))
 			clif_clearunit_single(tbl->id,CLR_OUTSIGHT,sd->fd);
 	}
 	return 0;
@@ -10706,11 +10724,11 @@ void clif_name( struct block_list* src, struct block_list *bl, send_target targe
 
 				int option = battle_config.show_mob_info;
 
-#ifdef Pandas_MapFlag_Mobinfo
+#ifdef Pandas_MapFlag_MobInfo
 				if (md->bl.m >= 0 && map_getmapflag(md->bl.m, MF_MOBINFO)) {
-					option = map_getmapflag_param(md->bl.m, MF_MOBINFO, 0);
+					option = map_getmapflag_param(md->bl.m, MF_MOBINFO, 1);
 				}
-#endif // Pandas_MapFlag_Mobinfo
+#endif // Pandas_MapFlag_MobInfo
 
 				// ========================================================
 				// 开始处理第一个数据栏位的内容
@@ -11504,7 +11522,6 @@ void clif_parse_WantToConnection(int fd, map_session_data* sd)
 	}
 
 	CREATE(sd, TBL_PC, 1);
-	// placement new
 	new(sd) map_session_data();
 	sd->fd = fd;
 #ifdef PACKET_OBFUSCATION
@@ -17970,7 +17987,7 @@ void clif_parse_Auction_register(int fd, map_session_data *sd)
 		pc_delitem(sd, sd->auction.index, sd->auction.amount, 1, 6, LOG_TYPE_AUCTION);
 		sd->auction.amount = 0;
 
-		pc_payzeny(sd, zeny, LOG_TYPE_AUCTION, NULL);
+		pc_payzeny(sd, zeny, LOG_TYPE_AUCTION);
 	}
 }
 
@@ -18010,7 +18027,7 @@ void clif_parse_Auction_bid(int fd, map_session_data *sd){
 	else if ( CheckForCharServer() ) // char server is down (bugreport:1138)
 		clif_Auction_message(fd, 0); // You have failed to bid into the auction
 	else {
-		pc_payzeny(sd, bid, LOG_TYPE_AUCTION, NULL);
+		pc_payzeny(sd, bid, LOG_TYPE_AUCTION);
 		intif_Auction_bid(sd->status.char_id, sd->status.name, auction_id, bid);
 	}
 }
@@ -23495,7 +23512,7 @@ void clif_parse_refineui_refine( int fd, map_session_data* sd ){
 	}
 
 	// Try to pay for the refine
-	if( pc_payzeny( sd, cost->zeny, LOG_TYPE_CONSUME, NULL ) ){
+	if( pc_payzeny( sd, cost->zeny, LOG_TYPE_CONSUME ) ){
 		clif_npc_buy_result( sd, e_purchase_result::PURCHASE_FAIL_MONEY ); // "You do not have enough zeny."
 		return;
 	}
@@ -23659,7 +23676,7 @@ bool clif_parse_stylist_buy_sub( map_session_data* sd, _look look, int16 index )
 		return false;
 	}
 
-	if( costs->price > 0 && pc_payzeny( sd, costs->price, LOG_TYPE_OTHER, nullptr ) != 0 ){
+	if( costs->price > 0 && pc_payzeny( sd, costs->price, LOG_TYPE_OTHER ) != 0 ){
 		return false;
 	}
 
@@ -24643,11 +24660,7 @@ void clif_enchantgrade_add( map_session_data& sd, uint16 index = UINT16_MAX, std
 
 	if( index < UINT16_MAX ){
 		p->index = client_index( index );
-		if( sd.inventory.u.items_inventory[index].refine >= gradeLevel->refine ){
-			p->success_chance = gradeLevel->chance / 100;
-		}else{
-			p->success_chance = 0;
-		}
+		p->success_chance = gradeLevel->chances[sd.inventory.u.items_inventory[index].refine] / 100;
 		p->blessing_info.id = client_nameid( gradeLevel->catalyst.item );
 		p->blessing_info.amount = gradeLevel->catalyst.amountPerStep;
 		p->blessing_info.max_blessing = gradeLevel->catalyst.maximumSteps;
@@ -24823,8 +24836,10 @@ void clif_parse_enchantgrade_start( int fd, map_session_data* sd ){
 		return;
 	}
 
-	// Not refined enough
-	if( sd->inventory.u.items_inventory[index].refine < enchantgradelevel->refine ){
+	uint16 totalChance = enchantgradelevel->chances[sd->inventory.u.items_inventory[index].refine];
+
+	// No chance to increase the enchantgrade
+	if( totalChance == 0 ){
 		return;
 	}
 
@@ -24840,7 +24855,6 @@ void clif_parse_enchantgrade_start( int fd, map_session_data* sd ){
 		return;
 	}
 
-	uint16 totalChance = enchantgradelevel->chance;
 	uint16 steps = min( p->blessing_amount, enchantgradelevel->catalyst.maximumSteps );
 	std::unordered_map<uint16, uint16> requiredItems;
 
@@ -24913,7 +24927,7 @@ void clif_parse_enchantgrade_start( int fd, map_session_data* sd ){
 		}
 	}
 
-	if( pc_payzeny( sd, option->zeny, LOG_TYPE_ENCHANTGRADE, nullptr ) > 0 ){
+	if( pc_payzeny( sd, option->zeny, LOG_TYPE_ENCHANTGRADE ) > 0 ){
 		return;
 	}
 
@@ -25359,7 +25373,7 @@ void clif_parse_enchantwindow_general( int fd, map_session_data* sd ){
 		materials[idx] = entry.second;
 	}
 
-	if( pc_payzeny( sd, enchant_slot->normal.zeny, LOG_TYPE_ENCHANT, nullptr ) != 0 ){
+	if( pc_payzeny( sd, enchant_slot->normal.zeny, LOG_TYPE_ENCHANT ) != 0 ){
 		return;
 	}
 
@@ -25486,7 +25500,7 @@ void clif_parse_enchantwindow_perfect( int fd, map_session_data* sd ){
 		materials[idx] = entry.second;
 	}
 
-	if( pc_payzeny( sd, perfect_enchant->zeny, LOG_TYPE_ENCHANT, nullptr ) != 0 ){
+	if( pc_payzeny( sd, perfect_enchant->zeny, LOG_TYPE_ENCHANT ) != 0 ){
 		return;
 	}
 
@@ -25583,7 +25597,7 @@ void clif_parse_enchantwindow_upgrade( int fd, map_session_data* sd ){
 		materials[idx] = entry.second;
 	}
 
-	if( pc_payzeny( sd, upgrade->zeny, LOG_TYPE_ENCHANT, nullptr ) != 0 ){
+	if( pc_payzeny( sd, upgrade->zeny, LOG_TYPE_ENCHANT ) != 0 ){
 		return;
 	}
 
@@ -25688,7 +25702,7 @@ void clif_parse_enchantwindow_reset( int fd, map_session_data* sd ){
 		materials[idx] = entry.second;
 	}
 
-	if( pc_payzeny( sd, enchant->reset.zeny, LOG_TYPE_ENCHANT, nullptr ) != 0 ){
+	if( pc_payzeny( sd, enchant->reset.zeny, LOG_TYPE_ENCHANT ) != 0 ){
 		return;
 	}
 
