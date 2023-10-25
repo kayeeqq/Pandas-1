@@ -67,7 +67,7 @@
 	//         ^ 此处第四段为 1 表示这是一个 1.0.2 的开发版本 (develop)
 	// 
 	// 在 Windows 环境下, 程序启动时会根据第四段的值自动携带对应的版本后缀, 以便进行版本区分
-	#define Pandas_Version "1.2.0.0"
+	#define Pandas_Version "1.2.2.0"
 
 	// 在启动时显示 Pandas 的 LOGO
 	#define Pandas_Show_Logo
@@ -221,6 +221,9 @@
 
 	// 使 status_change 能保存 cloak 是否正在进行中的状态 [Sola丶小克]
 	#define Pandas_Struct_Status_Change_Cloak_Reverting
+
+	// 使 map_data 能保存全部魔物的刷新点信息 [Sola丶小克]
+	#define Pandas_Struct_Map_Data_Mob_Spawns
 #endif // Pandas_StructIncrease
 
 // ============================================================================
@@ -972,9 +975,6 @@
 	// 备注: 单次获得的经验超过 long 的有效阈值范围后就会溢出成负数, 但最新的有效经验值区间是 int64
 	#define Pandas_Fix_GainExp_Display_Overflow
 
-	// 修正 bonus3 bAddEffOnSkill 中 PC_BONUS_CHK_SC 带入检测参数错误的问题 [Renee]
-	#define Pandas_Fix_bouns3_bAddEffOnSkill_PC_BONUS_CHK_SC_Error
-
 	// 修正 inter_server.yml 中的 Max 超大时没有妥善处理的问题 [Sola丶小克]
 	// 启用后 Max 字段的值最多不能超过 MAX_STORAGE 的值
 	#define Pandas_Fix_INTER_SERVER_DB_Field_Verify
@@ -1025,6 +1025,10 @@
 
 	// 修正启用 use_sql_db 之后终端加载信息出现来源数据表为 (null) 的问题 [Sola丶小克]
 	#define Pandas_Fix_Use_SQL_DB_Make_Terminal_Show_Null
+
+	// 修正 script_cleararray_pc 无法清空单元素数组的问题 [Sola丶小克]
+	// 特别感谢 "最美的Secret" 指出此问题
+	#define Pandas_Fix_ClearArray_The_First_Element_Is_Ignored
 #endif // Pandas_Bugfix
 
 // ============================================================================
@@ -1309,6 +1313,14 @@
 
 	// 优化 map-server-generator 的输出信息 [Sola丶小克]
 	#define Pandas_UserExperience_MapServerGenerator_Output
+
+	// 在 Linux 平台上使用 Ctrl+C 输出 ^C 符号之后换一行 [Sola丶小克]
+	#ifndef _WIN32
+		#define Pandas_UserExperience_Linux_Ctrl_C_WarpLine
+	#endif // _WIN32
+
+	// 在 Debug 模式下隐藏玩家数据流转的子网掩码调试信息 [Sola丶小克]
+	#define Pandas_UserExperience_Debug_Hide_SubnetInfo
 #endif // Pandas_UserExperience
 
 // ============================================================================
@@ -1682,7 +1694,7 @@
 	#define Pandas_MapFlag_NoSlave
 
 	// 是否启用 nobank 地图标记 [聽風]
-	// 该标记用于禁止玩家在地图上使用银行系统 (包括存款 / 提现操作)
+	// rAthena 官方已经实现此标记, 当前宏定义所包含的代码用于处理体验细节
 	#define Pandas_MapFlag_NoBank
 
 	// 是否启用 nouseitem 地图标记 [HongShin]
@@ -2141,11 +2153,17 @@
 
 	// 是否启用 getmapspawns 脚本指令 [Sola丶小克]
 	// 该指令用于获取指定地图的魔物刷新点信息
-	#define Pandas_ScriptCommand_GetMapSpawns
+	// 此选项开关需要依赖 Pandas_Struct_Map_Data_Mob_Spawns 的拓展
+	#ifdef Pandas_Struct_Map_Data_Mob_Spawns
+		#define Pandas_ScriptCommand_GetMapSpawns
+	#endif // Pandas_Struct_Map_Data_Mob_Spawns
 
 	// 是否启用 getmobspawns 脚本指令 [Sola丶小克]
 	// 该指令用于查询指定魔物在不同地图的刷新点信息
-	#define Pandas_ScriptCommand_GetMobSpawns
+	// 此选项开关需要依赖 Pandas_Struct_Map_Data_Mob_Spawns 的拓展
+	#ifdef Pandas_Struct_Map_Data_Mob_Spawns
+		#define Pandas_ScriptCommand_GetMobSpawns
+	#endif // Pandas_Struct_Map_Data_Mob_Spawns
 
 	// 是否启用 getcalendartime 脚本指令 [Haru]
 	// 该指令用于获取下次出现指定时间的 UNIX 时间戳

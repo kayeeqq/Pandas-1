@@ -65,13 +65,13 @@ inline static void item_script_process(std::shared_ptr<item_data> item, e_script
 	switch (script_type)
 	{
 	case SCRIPT_TYPE_USED:
-		item->pandas.script_plaintext.script = strTrim(script);
+		item->pandas.script_plaintext.script = util::trim_copy(script);
 		break;
 	case SCRIPT_TYPE_EQUIP:
-		item->pandas.script_plaintext.equip_script = strTrim(script);
+		item->pandas.script_plaintext.equip_script = util::trim_copy(script);
 		break;
 	case SCRIPT_TYPE_UNEQUIP:
-		item->pandas.script_plaintext.unequip_script = strTrim(script);
+		item->pandas.script_plaintext.unequip_script = util::trim_copy(script);
 		break;
 	default:
 		break;
@@ -286,6 +286,8 @@ uint64 ItemDatabase::parseBodyNode(const ryml::NodeRef& node) {
 			item->subtype = 0;
 	}
 
+	bool has_buy = false, has_sell = false;
+
 	if (this->nodeExists(node, "Buy")) {
 		uint32 buy;
 
@@ -297,6 +299,7 @@ uint64 ItemDatabase::parseBodyNode(const ryml::NodeRef& node) {
 			buy = MAX_ZENY;
 		}
 
+		has_buy = true;
 		item->value_buy = buy;
 	} else {
 		if (!exists) {
@@ -315,12 +318,15 @@ uint64 ItemDatabase::parseBodyNode(const ryml::NodeRef& node) {
 			sell = MAX_ZENY;
 		}
 
+		has_sell = true;
 		item->value_sell = sell;
 	} else {
 		if (!exists) {
 			item->value_sell = 0;
 		}
 	}
+
+	hasPriceValue[item->nameid] = { has_buy, has_sell };
 
 	if (this->nodeExists(node, "Weight")) {
 		uint32 weight;
@@ -1278,9 +1284,9 @@ void ItemDatabase::loadingFinished(){
 		}
 
 		// When a particular price is not given, we should base it off the other one
-		if (item->value_buy == 0 && item->value_sell > 0)
+		if (!hasPriceValue[item->nameid].has_buy && hasPriceValue[item->nameid].has_sell)
 			item->value_buy = item->value_sell * 2;
-		else if (item->value_buy > 0 && item->value_sell == 0)
+		else if (hasPriceValue[item->nameid].has_buy && !hasPriceValue[item->nameid].has_sell)
 			item->value_sell = item->value_buy / 2;
 
 		if (item->value_buy / 124. < item->value_sell / 75.) {
@@ -1311,6 +1317,7 @@ void ItemDatabase::loadingFinished(){
 	}
 
 	TypesafeCachedYamlDatabase::loadingFinished();
+	hasPriceValue.clear();
 }
 
 /**
@@ -3838,7 +3845,7 @@ uint64 ComboDatabase::parseBodyNode(const ryml::NodeRef& node) {
 			combo->script = parse_script(script.c_str(), this->getCurrentFile().c_str(), this->getLineNumber(node["Script"]), SCRIPT_IGNORE_EXTERNAL_BRACKETS);
 
 #ifdef Pandas_Struct_S_Item_Combo_With_Plaintext
-			combo->script_plaintext = strTrim(script);
+			combo->script_plaintext = util::trim_copy(script);
 #endif // Pandas_Struct_S_Item_Combo_With_Plaintext
 		} else {
 			if (!exists) {
@@ -4414,11 +4421,11 @@ bool itemdb_isNoEquip(struct item_data *id, uint16 m) {
 	struct map_data *mapdata = map_getmapdata(m);
 
 	if ((id->flag.no_equip&1 && !mapdata_flag_vs2(mapdata)) || // Normal
-		(id->flag.no_equip&2 && mapdata->flag[MF_PVP]) || // PVP
+		(id->flag.no_equip&2 && mapdata->getMapFlag(MF_PVP)) || // PVP
 		(id->flag.no_equip&4 && mapdata_flag_gvg2_no_te(mapdata)) || // GVG
-		(id->flag.no_equip&8 && mapdata->flag[MF_BATTLEGROUND]) || // Battleground
+		(id->flag.no_equip&8 && mapdata->getMapFlag(MF_BATTLEGROUND)) || // Battleground
 		(id->flag.no_equip&16 && mapdata_flag_gvg2_te(mapdata)) || // WOE:TE
-		(id->flag.no_equip&(mapdata->zone) && mapdata->flag[MF_RESTRICTED]) // Zone restriction
+		(id->flag.no_equip&(mapdata->zone) && mapdata->getMapFlag(MF_RESTRICTED)) // Zone restriction
 		)
 		return true;
 	return false;
@@ -4478,7 +4485,7 @@ uint64 RandomOptionDatabase::parseBodyNode(const ryml::NodeRef& node) {
 		randopt->script = parse_script(script.c_str(), this->getCurrentFile().c_str(), this->getLineNumber(node["Script"]), SCRIPT_IGNORE_EXTERNAL_BRACKETS);
 
 #ifdef Pandas_Struct_S_Random_Opt_Data_With_Plaintext
-		randopt->script_plaintext = strTrim(script);
+		randopt->script_plaintext = util::trim_copy(script);
 #endif // Pandas_Struct_S_Random_Opt_Data_With_Plaintext
 	}
 

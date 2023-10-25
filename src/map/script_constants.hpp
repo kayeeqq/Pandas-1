@@ -787,6 +787,7 @@
 	export_constant(MF_NOPETCAPTURE);
 	export_constant(MF_NOBUYINGSTORE);
 	export_constant(MF_NODYNAMICNPC);
+	export_constant(MF_NOBANK);
 
 #ifdef Pandas_MapFlag_MobInfo
 	export_constant(MF_MOBINFO);
@@ -863,10 +864,6 @@
 #ifdef Pandas_MapFlag_NoSlave
 	export_constant(MF_NOSLAVE);
 #endif // Pandas_MapFlag_NoSlave
-
-#ifdef Pandas_MapFlag_NoBank
-	export_constant(MF_NOBANK);
-#endif // Pandas_MapFlag_NoBank
 
 #ifdef Pandas_MapFlag_NoUseItem
 	export_constant(MF_NOUSEITEM);
@@ -1364,6 +1361,7 @@
 	export_constant2("Eff_Freezing",SC_FREEZING);
 	export_constant2("Eff_Heat",SC_BURNT);
 	export_constant2("Eff_Deepsleep",SC_DEEPSLEEP);
+	export_constant2("Eff_WhiteImprison",SC_WHITEIMPRISON);
 
 	export_constant2("SC_ALL",SC_NONE);
 
@@ -7257,6 +7255,7 @@
 	export_constant(IG_CLASS_SHADOW_PD_CUBE);
 	export_constant(IG_CLASS_SHADOW_EA_CUBE);
 	export_constant(IG_ENCHANT_STONE_BOX30);
+	export_constant(IG_ENCHANT_STONE_BOX31);
 
 	/* unit stop walking */
 	export_constant(USW_NONE);
